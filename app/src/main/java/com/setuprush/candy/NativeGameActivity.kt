@@ -12,6 +12,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -449,6 +451,92 @@ fun NativeGameScreen(
             }
         }
     ) { innerPadding ->
+        val performLongEntry = {
+            if (!isPlayerHolding) {
+                val startP = SetupEngine.priceAt(engine.candles, tapePosition)
+                isPlayerHolding = true
+                activeDirection = 1
+                tradeEntryPrice = startP
+                bridge.vibrate("hold_long")
+                val fb = SetupExecutionTimingEngine.evaluateEntry(
+                    activeSetup = activeSetup,
+                    tapePosition = tapePosition,
+                    isLong = true
+                )
+                lastOutcome = "${fb.grade.badge} ${fb.grade.title}: ENTERED LONG [${activeSymbol.id}]"
+            }
+        }
+
+        val performShortEntry = {
+            if (!isPlayerHolding) {
+                val startP = SetupEngine.priceAt(engine.candles, tapePosition)
+                isPlayerHolding = true
+                activeDirection = -1
+                tradeEntryPrice = startP
+                bridge.vibrate("slide_short")
+                val fb = SetupExecutionTimingEngine.evaluateEntry(
+                    activeSetup = activeSetup,
+                    tapePosition = tapePosition,
+                    isLong = false
+                )
+                lastOutcome = "${fb.grade.badge} ${fb.grade.title}: ENTERED SHORT [${activeSymbol.id}]"
+            }
+        }
+
+        val performCashOut = {
+            if (isPlayerHolding) {
+                val pnl = livePnl
+                isPlayerHolding = false
+                totalScore += pnl
+                if (pnl > 0) {
+                    streak++
+                    playerTakesCount++
+                    bridge.vibrate("cash_out")
+                    lastOutcome = "CASHED OUT: +$${String.format("%.2f", pnl)}"
+                    OpponentDuelEngine.recordPlayerCashOut(pnl)
+                    activeStrategyKey?.let {
+                        StrategyMasteryManager.recordTrade(it, isWin = true, rMultiple = 2.0)
+                    }
+                    val mission = StrategyMasteryManager.activeMission
+                    if (mission != null) {
+                        val stars = if (pnl >= 120.0) 3 else 2
+                        StrategyMasteryManager.completeMission(mission.levelId, stars, pnl)
+                        lastOutcome = "MISSION ${mission.levelId} CLEARED! +$${String.format("%.2f", pnl)} ($stars STARS ⭐)"
+                    }
+                } else {
+                    streak = 0
+                    playerStopsCount++
+                    bridge.vibrate("liquidation")
+                    lastOutcome = "LOSS: -$${String.format("%.2f", abs(pnl))}"
+                    OpponentDuelEngine.recordPlayerStopLoss()
+                    activeStrategyKey?.let {
+                        StrategyMasteryManager.recordTrade(it, isWin = false)
+                    }
+                    val mission = StrategyMasteryManager.activeMission
+                    if (mission != null) {
+                        lastOutcome = "MISSION ${mission.levelId} FAILED: -$${String.format("%.2f", abs(pnl))} · RETRY"
+                    }
+                }
+
+                // Duel check
+                if (OpponentDuelEngine.isCompetitiveActive) {
+                    val rivalWins = OpponentDuelEngine.activeRival?.roundsWon ?: 0
+                    if (OpponentDuelEngine.playerRoundsWon >= 2 || rivalWins >= 2) {
+                        MatchPerformanceEngine.generateDebrief(
+                            modeId = "1v1",
+                            symbol = activeSymbol.id,
+                            playerTakes = playerTakesCount,
+                            playerStops = playerStopsCount,
+                            playerPnl = totalScore,
+                            playerBestStreak = streak,
+                            precisionScore = 0.85
+                        )
+                        showPostMatchDebriefDialog = true
+                    }
+                }
+            }
+        }
+
         if (showMasterMenuHub) {
             GameMenuHub(
                 theme = theme,
@@ -501,283 +589,210 @@ fun NativeGameScreen(
                     .padding(innerPadding)
             )
         } else {
-            // Fullscreen Game Play Stage
-            Box(
+            // Full Tactical Combat Screen: Chart Stage + Dedicated Bottom Action Bar
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // 1. Fullscreen Ultra-Fluid Candlestick Chart Canvas
-                ChartCanvas(
-                    candles = engine.candles,
-                    tapePosition = tapePosition,
-                    theme = theme,
-                    camera = camera,
-                    activeSetup = activeSetup,
-                    supertrendEnabled = supertrendEnabled,
-                    structureEnabled = structureEnabled,
-                    fvgEnabled = fvgEnabled,
-                    emaCrossEnabled = emaCrossEnabled,
-                    patternLockEnabled = patternLockEnabled,
-                    isExternalHolding = isPlayerHolding,
-                    externalDirection = activeDirection,
-                    externalEntryPrice = tradeEntryPrice,
-                    externalLivePnl = livePnl,
-                    currentLeverage = currentLeverage,
-                    onLongEntry = {
-                        isPlayerHolding = true
-                        activeDirection = 1
-                        tradeEntryPrice = currentPrice
-                        bridge.vibrate("hold_long")
-                        val fb = SetupExecutionTimingEngine.evaluateEntry(
-                            activeSetup = activeSetup,
-                            tapePosition = tapePosition,
-                            isLong = true
-                        )
-                        lastOutcome = "${fb.grade.badge} ${fb.grade.title}: ENTERED LONG [${activeSymbol.id}]"
-                    },
-                    onShortEntry = {
-                        isPlayerHolding = true
-                        activeDirection = -1
-                        tradeEntryPrice = currentPrice
-                        bridge.vibrate("slide_short")
-                        val fb = SetupExecutionTimingEngine.evaluateEntry(
-                            activeSetup = activeSetup,
-                            tapePosition = tapePosition,
-                            isLong = false
-                        )
-                        lastOutcome = "${fb.grade.badge} ${fb.grade.title}: ENTERED SHORT [${activeSymbol.id}]"
-                    },
-                    onCashOut = { pnl ->
-                        isPlayerHolding = false
-                        totalScore += pnl
-                        if (pnl > 0) {
-                            streak++
-                            playerTakesCount++
-                            bridge.vibrate("cash_out")
-                            lastOutcome = "CASHED OUT: +$${String.format("%.2f", pnl)}"
-                            OpponentDuelEngine.recordPlayerCashOut(pnl)
-                            activeStrategyKey?.let {
-                                StrategyMasteryManager.recordTrade(it, isWin = true, rMultiple = 2.0)
-                            }
-                            val mission = StrategyMasteryManager.activeMission
-                            if (mission != null) {
-                                val stars = if (pnl >= 120.0) 3 else 2
-                                StrategyMasteryManager.completeMission(mission.levelId, stars, pnl)
-                                lastOutcome = "MISSION ${mission.levelId} CLEARED! +$${String.format("%.2f", pnl)} ($stars STARS ⭐)"
-                            }
-                        } else {
-                            streak = 0
-                            playerStopsCount++
-                            bridge.vibrate("liquidation")
-                            lastOutcome = "LOSS: -$${String.format("%.2f", abs(pnl))}"
-                            OpponentDuelEngine.recordPlayerStopLoss()
-                            activeStrategyKey?.let {
-                                StrategyMasteryManager.recordTrade(it, isWin = false)
-                            }
-                            val mission = StrategyMasteryManager.activeMission
-                            if (mission != null) {
-                                lastOutcome = "MISSION ${mission.levelId} FAILED: -$${String.format("%.2f", abs(pnl))} · RETRY"
+                // 1. Chart Stage (Takes full available vertical space above action bar)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    ChartCanvas(
+                        candles = engine.candles,
+                        tapePosition = tapePosition,
+                        theme = theme,
+                        camera = camera,
+                        activeSetup = activeSetup,
+                        supertrendEnabled = supertrendEnabled,
+                        structureEnabled = structureEnabled,
+                        fvgEnabled = fvgEnabled,
+                        emaCrossEnabled = emaCrossEnabled,
+                        patternLockEnabled = patternLockEnabled,
+                        isExternalHolding = isPlayerHolding,
+                        externalDirection = activeDirection,
+                        externalEntryPrice = tradeEntryPrice,
+                        externalLivePnl = livePnl,
+                        currentLeverage = currentLeverage,
+                        onLongEntry = performLongEntry,
+                        onShortEntry = performShortEntry,
+                        onCashOut = { performCashOut() },
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // 1b. Tactical Solo Campaign Mission Objective HUD Banner
+                    val currentMission = StrategyMasteryManager.activeMission
+                    if (currentMission != null) {
+                        Surface(
+                            color = Color(0xFF131924).copy(alpha = 0.95f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.2.dp, Color(0xFFFFC700)),
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 4.dp, start = 14.dp, end = 14.dp)
+                                .shadow(6.dp, RoundedCornerShape(8.dp), spotColor = Color(0xFFFFC700))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🎯", fontSize = 13.sp)
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            text = "OP ${currentMission.levelId}: ${currentMission.callsign}",
+                                            color = Color(0xFFFFC700),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "· ${currentMission.targetBias} [${currentMission.targetSetupKey.uppercase()}]",
+                                            color = Color(0xFF00E5FF),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                    Text(
+                                        text = "${currentMission.briefing} · CATCH MOVE TO REACH +2R TAKE PROFIT",
+                                        color = Color(0xFF8A99AD),
+                                        fontSize = 8.5.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
                             }
                         }
+                    }
 
-                        // Duel check
-                        if (OpponentDuelEngine.isCompetitiveActive) {
-                            val rivalWins = OpponentDuelEngine.activeRival?.roundsWon ?: 0
-                            if (OpponentDuelEngine.playerRoundsWon >= 2 || rivalWins >= 2) {
-                                MatchPerformanceEngine.generateDebrief(
-                                    modeId = "1v1",
-                                    symbol = activeSymbol.id,
-                                    playerTakes = playerTakesCount,
-                                    playerStops = playerStopsCount,
-                                    playerPnl = totalScore,
-                                    playerBestStreak = streak,
-                                    precisionScore = 0.85
-                                )
-                                showPostMatchDebriefDialog = true
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // 1b. Tactical Solo Campaign Mission Objective HUD Banner
-                val currentMission = StrategyMasteryManager.activeMission
-                if (currentMission != null) {
-                    Surface(
-                        color = Color(0xFF131924).copy(alpha = 0.95f),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.2.dp, Color(0xFFFFC700)),
+                    // 2. Mid-Upper Pattern Locked Banner (Setup Rush signature banner)
+                    AnimatedVisibility(
+                        visible = activeSetup != null,
+                        enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.92f),
+                        exit = fadeOut(animationSpec = tween(180)),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 4.dp, start = 14.dp, end = 14.dp)
-                            .shadow(6.dp, RoundedCornerShape(8.dp), spotColor = Color(0xFFFFC700))
+                            .padding(top = if (currentMission != null) 42.dp else 10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🎯", fontSize = 13.sp)
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        activeSetup?.let { setup ->
+                            val isBull = setup.dir == 1
+                            val badgeColor = if (isBull) theme.bull else theme.bear
+
+                            Surface(
+                                color = theme.bg.copy(alpha = 0.94f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.75f)),
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = badgeColor, spotColor = badgeColor)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Surface(
+                                        color = badgeColor,
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "⚡ PATTERN LOCKED · ×${max(1, streak)} STREAK",
+                                            color = if (theme.isLight) Color.White else Color.Black,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            letterSpacing = 1.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                        )
+                                    }
                                     Text(
-                                        text = "OP ${currentMission.levelId}: ${currentMission.callsign}",
-                                        color = Color(0xFFFFC700),
-                                        fontSize = 11.sp,
+                                        text = setup.name.uppercase(),
+                                        color = theme.text,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace
                                     )
-                                    Text(
-                                        text = "· ${currentMission.targetBias} [${currentMission.targetSetupKey.uppercase()}]",
-                                        color = Color(0xFF00E5FF),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (isBull) "BULLISH ▲" else "BEARISH ▼",
+                                            color = badgeColor,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = if (isBull) "HOLD BUY TO RIDE" else "HOLD SELL TO SHORT",
+                                            color = theme.text,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "${(setup.winRate * 100).toInt()}% WIN",
+                                            color = theme.muted,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
                                 }
-                                Text(
-                                    text = "${currentMission.briefing} · CATCH MOVE TO REACH +2R TAKE PROFIT",
-                                    color = Color(0xFF8A99AD),
-                                    fontSize = 8.5.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
                             }
                         }
                     }
-                }
 
-                // 2. Mid-Upper Pattern Locked Banner (Setup Rush signature banner)
-                AnimatedVisibility(
-                    visible = activeSetup != null,
-                    enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.92f),
-                    exit = fadeOut(animationSpec = tween(180)),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 10.dp)
-                ) {
-                    activeSetup?.let { setup ->
-                        val isBull = setup.dir == 1
-                        val badgeColor = if (isBull) theme.bull else theme.bear
+                    // 3. Competitive Opponent Radar (if duel is active)
+                    if (OpponentDuelEngine.isCompetitiveActive) {
+                        OpponentRadarHUD(
+                            theme = theme,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 70.dp, end = 12.dp)
+                        )
+                    }
 
+                    // 4. Floating Outcome Toast Message
+                    lastOutcome?.let { msg ->
                         Surface(
                             color = theme.bg.copy(alpha = 0.94f),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.75f)),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.35f)),
                             modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = badgeColor, spotColor = badgeColor)
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Surface(
-                                    color = badgeColor,
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "⚡ PATTERN LOCKED · ×${max(1, streak)} STREAK",
-                                        color = if (theme.isLight) Color.White else Color.Black,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        letterSpacing = 1.sp,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
-                                    )
-                                }
-                                Text(
-                                    text = setup.name.uppercase(),
-                                    color = theme.text,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (isBull) "BULLISH ▲" else "BEARISH ▼",
-                                        color = badgeColor,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = if (isBull) "HOLD TO RIDE" else "SLIDE DOWN TO SHORT",
-                                        color = theme.text,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = "${(setup.winRate * 100).toInt()}% WIN",
-                                        color = theme.muted,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
+                            Text(
+                                text = msg,
+                                color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) theme.bull
+                                else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) theme.bear
+                                else theme.text,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                            )
                         }
                     }
                 }
 
-                // 3. Competitive Opponent Radar (if duel is active)
-                if (OpponentDuelEngine.isCompetitiveActive) {
-                    OpponentRadarHUD(
-                        theme = theme,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 70.dp, end = 12.dp)
-                    )
-                }
-
-                // 4. Floating Outcome Toast Message
-                lastOutcome?.let { msg ->
-                    Surface(
-                        color = theme.bg.copy(alpha = 0.94f),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 76.dp)
-                    ) {
-                        Text(
-                            text = msg,
-                            color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) theme.bull
-                            else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) theme.bear
-                            else theme.text,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                        )
-                    }
-                }
-
-                // 5. Tactical Non-Intrusive Guidance Pill (No touch interception, edge-to-edge chart)
-                if (!isPlayerHolding) {
-                    Surface(
-                        color = Color(0xFF0C1017).copy(alpha = 0.70f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFF232D3B).copy(alpha = 0.85f)),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 8.dp)
-                    ) {
-                        Text(
-                            text = "HOLD CANVAS TO RIDE LONG · SLIDE DOWN FOR SHORT · RELEASE TO CASH OUT",
-                            color = Color(0xFF8A99AD),
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.5.dp)
-                        )
-                    }
-                }
+                // 2. Tactical Dedicated Hold-to-Ride Action Bar (BUY & SELL Buttons with zero overlap)
+                TacticalHoldToRideBar(
+                    isPlayerHolding = isPlayerHolding,
+                    activeDirection = activeDirection,
+                    livePnl = livePnl,
+                    currentLeverage = currentLeverage,
+                    theme = theme,
+                    onStartLong = performLongEntry,
+                    onStartShort = performShortEntry,
+                    onRelease = performCashOut,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
 
@@ -912,6 +927,258 @@ fun NativeGameScreen(
                     showPreMatchShowcase = false
                 }
             )
+        }
+    }
+}
+
+/**
+ * Dedicated Tactical Hold-to-Ride Action Bar with Dual Triggers:
+ * - Left Trigger: SELL / SHORT (Crimson/Ruby theme)
+ * - Right Trigger: BUY / LONG (Emerald/Cyan theme)
+ * 
+ * Interaction:
+ * - Touch & hold: Immediately opens trade and holds position!
+ * - Real-time profit ticks inside the button itself and on chart!
+ * - Release finger: Cashes out immediately and banks P&L!
+ */
+@Composable
+fun TacticalHoldToRideBar(
+    isPlayerHolding: Boolean,
+    activeDirection: Int, // 1 = Long, -1 = Short
+    livePnl: Double,
+    currentLeverage: Double,
+    theme: com.setuprush.candy.theme.GameTheme,
+    onStartLong: () -> Unit,
+    onStartShort: () -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = Color(0xFF090D14),
+        border = BorderStroke(1.dp, Color(0xFF1B2433)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            // Micro hint text
+            Text(
+                text = if (isPlayerHolding) "HOLDING POSITION · RELEASE BUTTON TO CASH OUT" else "PRESS & HOLD BUTTON TO RIDE · RELEASE TO CASH OUT",
+                color = if (isPlayerHolding) Color(0xFFFFC700) else Color(0xFF8A99AD),
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // ==================== SELL / SHORT BUTTON ====================
+                val isShortActive = isPlayerHolding && activeDirection == -1
+                val isLongActive = isPlayerHolding && activeDirection == 1
+                val shortAlpha = if (isLongActive) 0.35f else 1f
+                val shortBorder = if (isShortActive) Color(0xFFFF334B) else Color(0xFFFF334B).copy(alpha = 0.7f)
+                val shortBg = if (isShortActive) {
+                    Brush.horizontalGradient(listOf(Color(0xFFFF1744), Color(0xFFFF6D00)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFF221116), Color(0xFF140A0D)))
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(if (isShortActive) 2.dp else 1.5.dp, shortBorder),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .shadow(if (isShortActive) 10.dp else 4.dp, RoundedCornerShape(12.dp), spotColor = Color(0xFFFF334B))
+                        .pointerInput(isLongActive) {
+                            if (!isLongActive) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    onStartShort()
+                                    do {
+                                        val event = awaitPointerEvent()
+                                    } while (event.changes.any { it.pressed })
+                                    onRelease()
+                                }
+                            }
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(shortBg)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isShortActive) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                val pnlSign = if (livePnl >= 0) "+$" else "-$"
+                                val pnlText = "$pnlSign${String.format("%.2f", abs(livePnl))}"
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "⚡ SHORT ${currentLeverage.toInt()}×",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = pnlText,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Text(
+                                    text = "RELEASE TO CASH OUT",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            ) {
+                                Text("🔻", fontSize = 16.sp)
+                                Column {
+                                    Text(
+                                        text = "SELL / SHORT",
+                                        color = Color(0xFFFF5268).copy(alpha = shortAlpha),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "HOLD TO RIDE",
+                                        color = Color(0xFFB57784).copy(alpha = shortAlpha),
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ==================== BUY / LONG BUTTON ====================
+                val longBorder = if (isLongActive) Color(0xFF00E676) else Color(0xFF00E676).copy(alpha = 0.7f)
+                val longBg = if (isLongActive) {
+                    Brush.horizontalGradient(listOf(Color(0xFF00C853), Color(0xFF00E5FF)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFF0A2216), Color(0xFF06140D)))
+                }
+                val longAlpha = if (isShortActive) 0.35f else 1f
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(if (isLongActive) 2.dp else 1.5.dp, longBorder),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .shadow(if (isLongActive) 10.dp else 4.dp, RoundedCornerShape(12.dp), spotColor = Color(0xFF00E676))
+                        .pointerInput(isShortActive) {
+                            if (!isShortActive) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    onStartLong()
+                                    do {
+                                        val event = awaitPointerEvent()
+                                    } while (event.changes.any { it.pressed })
+                                    onRelease()
+                                }
+                            }
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(longBg)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isLongActive) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                val pnlSign = if (livePnl >= 0) "+$" else "-$"
+                                val pnlText = "$pnlSign${String.format("%.2f", abs(livePnl))}"
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "⚡ LONG ${currentLeverage.toInt()}×",
+                                        color = Color.Black,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = pnlText,
+                                        color = Color.Black,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Text(
+                                    text = "RELEASE TO CASH OUT",
+                                    color = Color.Black.copy(alpha = 0.8f),
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            ) {
+                                Text("▲", fontSize = 16.sp, color = Color(0xFF00E676))
+                                Column {
+                                    Text(
+                                        text = "BUY / LONG",
+                                        color = Color(0xFF00E676).copy(alpha = longAlpha),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "HOLD TO RIDE",
+                                        color = Color(0xFF6EAE8C).copy(alpha = longAlpha),
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
