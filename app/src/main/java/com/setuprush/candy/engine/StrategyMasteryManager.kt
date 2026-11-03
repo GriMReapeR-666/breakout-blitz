@@ -76,10 +76,7 @@ object StrategyMasteryManager {
         val creditsReward: Int = 150
     )
 
-    var availableSkillPoints: Int = 6
-
     private val progressMap = mutableMapOf<String, StrategyProgress>()
-    private val skillNodes = mutableListOf<SkillTreeNode>()
     private val campaignMissions = mutableListOf<SoloCampaignMission>()
 
     var activeMission: SoloCampaignMission? = null
@@ -93,75 +90,6 @@ object StrategyMasteryManager {
                 tier = if (isStarter) 5 else 1,
                 xp = if (isStarter) 2500 else 0,
                 isCertifiedForMultiplayer = isStarter
-            )
-        }
-
-        // Initialize 5-Tier Skill Trees for all 7 Strategy Families
-        StrategyCatalog.StrategyFamily.values().forEach { fam ->
-            skillNodes.add(
-                SkillTreeNode(
-                    id = "${fam.name.lowercase()}_tier1",
-                    family = fam,
-                    tier = 1,
-                    name = "Visual Anatomy",
-                    icon = "👁️",
-                    perkTitle = "Pattern Reticle",
-                    perkDesc = "Highlights setup formation candle on tape with tactical reticle.",
-                    spCost = 1,
-                    isUnlocked = true // Tier 1 unlocked by default
-                )
-            )
-            skillNodes.add(
-                SkillTreeNode(
-                    id = "${fam.name.lowercase()}_tier2",
-                    family = fam,
-                    tier = 2,
-                    name = "Precision Timing",
-                    icon = "🎯",
-                    perkTitle = "Sniper Entry",
-                    perkDesc = "+20% score bonus when executing within 2 candles of setup trigger.",
-                    spCost = 2,
-                    isUnlocked = false
-                )
-            )
-            skillNodes.add(
-                SkillTreeNode(
-                    id = "${fam.name.lowercase()}_tier3",
-                    family = fam,
-                    tier = 3,
-                    name = "Risk Armor",
-                    icon = "🛡️",
-                    perkTitle = "Trailing Guard",
-                    perkDesc = "Locks trailing stop to breakeven when position reaches +1R.",
-                    spCost = 3,
-                    isUnlocked = false
-                )
-            )
-            skillNodes.add(
-                SkillTreeNode(
-                    id = "${fam.name.lowercase()}_tier4",
-                    family = fam,
-                    tier = 4,
-                    name = "Order Flow Shield",
-                    icon = "⚡",
-                    perkTitle = "Fakeout Filter",
-                    perkDesc = "Institutional volume filter dampens false breakout whipsaws.",
-                    spCost = 4,
-                    isUnlocked = false
-                )
-            )
-            skillNodes.add(
-                SkillTreeNode(
-                    id = "${fam.name.lowercase()}_tier5",
-                    family = fam,
-                    tier = 5,
-                    name = "Grandmaster Apex",
-                    icon = "👑",
-                    perkTitle = "50x Lev Overdrive",
-                    perkDesc = "Unlocks 50x max leverage and certifies setup for ranked PvP duels.",
-                    spCost = 5,
-                    isUnlocked = false
-                )
             )
         }
 
@@ -219,7 +147,7 @@ object StrategyMasteryManager {
         campaignMissions.addAll(missionsDef)
     }
 
-    // ==================== CAMPAIGN & SKILL TREE APIS ====================
+    // ==================== CAMPAIGN MISSIONS APIS ====================
 
     fun getAllCampaignMissions(): List<SoloCampaignMission> = campaignMissions
 
@@ -231,28 +159,9 @@ object StrategyMasteryManager {
         return campaignMissions.find { it.levelId == id }
     }
 
-    fun getSkillTreeForFamily(family: StrategyCatalog.StrategyFamily): List<SkillTreeNode> {
-        return skillNodes.filter { it.family == family }
-    }
-
-    fun isPerkUnlocked(nodeId: String): Boolean {
-        return skillNodes.find { it.id == nodeId }?.isUnlocked ?: false
-    }
-
-    fun unlockPerk(nodeId: String): Boolean {
-        val node = skillNodes.find { it.id == nodeId } ?: return false
-        if (node.isUnlocked) return true
-        if (availableSkillPoints >= node.spCost) {
-            availableSkillPoints -= node.spCost
-            node.isUnlocked = true
-            return true
-        }
-        return false
-    }
-
     /**
      * Marks a campaign mission as completed, calculates star rating (1 to 3),
-     * awards XP, Credits, Skill Points, and unlocks the subsequent mission level.
+     * awards XP, Credits, and unlocks the subsequent mission level.
      */
     fun completeMission(levelId: Int, stars: Int, pnl: Double): Boolean {
         val mission = campaignMissions.find { it.levelId == levelId } ?: return false
