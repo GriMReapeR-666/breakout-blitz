@@ -102,9 +102,9 @@ class SetupEngine(
         fun mulberry32(seed: Long): () -> Double {
             var a = (seed and 0xFFFFFFFFL).toInt()
             return {
-                a = (a + 0x6D2B79F5).toInt()
-                var t = Math.imul(a xor (a ushr 15), 1 or a)
-                t = (t + Math.imul(t xor (t ushr 7), 61 or t)) xor t
+                a += 0x6D2B79F5.toInt()
+                var t = (a xor (a ushr 15)) * (1 or a)
+                t = (t + ((t xor (t ushr 7)) * (61 or t))) xor t
                 ((t xor (t ushr 14)).toLong() and 0xFFFFFFFFL).toDouble() / 4294967296.0
             }
         }
@@ -234,10 +234,9 @@ class SetupEngine(
     }
 
     /** Candle generator leg with volatility regimes */
-    class Leg(val rng: () -> Double, startPrice: Double) {
+    class Leg(val rng: () -> Double, startPrice: Double, var vol: Double = 0.26) {
         val candles = mutableListOf<Candle>()
         var price = startPrice
-        var vol = 0.26
         var wick = 0.16
         var vb = 1400.0
 

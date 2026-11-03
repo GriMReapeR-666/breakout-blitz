@@ -24,23 +24,44 @@ object OpponentDuelEngine {
         MARGIN_CALLED("MARGIN CALLED", "💥")
     }
 
+    data class MatchFormat(
+        val id: String,
+        val badge: String,
+        val title: String,
+        val subtitle: String
+    )
+
+    val MATCH_FORMATS = listOf(
+        MatchFormat("1v1", "⚔️ 1v1", "PROP DUEL", "Head-to-head match · First to +2R"),
+        MatchFormat("5v5", "🛡️ 5v5", "PORTFOLIO CLASH", "Multi-asset fund battle"),
+        MatchFormat("tournament", "🏆 100-TRADER", "MARGIN CALL ROYALE", "Last solvent standing"),
+        MatchFormat("solo", "🎯 SOLO", "DESK RUN", "Unlimited backtesting & setup practice")
+    )
+
     data class RivalTrader(
         val id: String,
         val name: String,
         val deskTag: String,
         val mmr: Int,
-        val title: String,
-        val badge: String,
+        val title: String = "Prop Desk Lead Trader",
+        val badge: String = "⚡",
+        val avatar: String = badge,
+        val preferredStyle: String = title,
+        val targetSetup: String = "smc_fvg",
+        val winRate: Double = 0.74,
+        val avgRMultiple: Double = 2.4,
         var status: RivalTradeStatus = RivalTradeStatus.FLAT,
         var entryPrice: Double = 0.0,
         var targetPrice: Double = 0.0,
         var stopPrice: Double = 0.0,
         var livePnl: Double = 0.0,
-        var targetProgress: Float = 0f, // 0.0f to 1.0f
+        var targetProgress: Float = 0f,
         var roundsWon: Int = 0,
         var totalBankedPnl: Double = 0.0,
         var isMarginCalled: Boolean = false
     )
+
+    typealias TraderRival = RivalTrader
 
     private val RIVAL_POOL = listOf(
         RivalTrader("rival_1", "Satoshi_Sniper", "TITAN", 2620, "Senior Order Flow Analyst", "⚡"),

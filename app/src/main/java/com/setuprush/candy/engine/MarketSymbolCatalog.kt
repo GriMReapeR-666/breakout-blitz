@@ -15,7 +15,14 @@ object MarketSymbolCatalog {
         val volatility: Double, // Multiplier on Brownian step volatility
         val role: String,
         val description: String,
-        val priceDecimals: Int = 2
+        val priceDecimals: Int = 2,
+        val badge: String = id,
+        val volatilityTier: String = when {
+            volatility < 0.20 -> "CALM"
+            volatility < 0.35 -> "NORMAL"
+            volatility < 0.50 -> "STORM"
+            else -> "VOLCANO"
+        }
     )
 
     val ALL_SYMBOLS = listOf(

@@ -1,5 +1,7 @@
 package com.setuprush.candy.engine
 
+typealias StrategyGroup = StrategyCatalog.StrategyFamily
+
 /**
  * Master catalog of all trading strategies and setups across Setup Rush.
  * Encompasses Price Action, Candlesticks, Smart Money Concepts (SMC),
@@ -16,8 +18,6 @@ object StrategyCatalog {
         MEAN_REVERSION("Mean Reversion & Oscillators", "REVERT", "RSI divergence, extreme oversold/overbought fading, and Bollinger mean bounces."),
         INDICATOR_TOP("Community Top Indicators", "COMM_TOP", "Famous community indicators: Squeeze Momentum, WaveTrend, UT Bot, Nadaraya-Watson, QQE, Waddah Attar.")
     }
-
-    typealias StrategyGroup = StrategyFamily
 
     data class SetupCardData(
         val key: String,

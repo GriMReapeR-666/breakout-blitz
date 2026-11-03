@@ -1,5 +1,8 @@
 package com.setuprush.candy
 
+import kotlin.math.max
+import kotlin.math.min
+
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle

@@ -27,7 +27,9 @@ import com.setuprush.candy.engine.SetupExecutionTimingEngine
 import com.setuprush.candy.engine.SetupRecord
 import com.setuprush.candy.theme.GameTheme
 import com.setuprush.candy.theme.ThemeManager
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.min
 
 /**
@@ -432,7 +434,7 @@ fun ChartCanvas(
                     ),
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
-                        .padding(horizontal = 16.dp, top = if (patternLockEnabled && activeSetup != null) 42.dp else 0.dp)
+                        .padding(horizontal = 16.dp).padding(top = if (patternLockEnabled && activeSetup != null) 42.dp else 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
