@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BacktestBlitz"
+rootProject.name = "BreakoutBlitz"
 include(":app")
