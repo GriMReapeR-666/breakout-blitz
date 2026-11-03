@@ -670,78 +670,71 @@ fun NativeGameScreen(
                     }
 
                     // 2. Mid-Upper Pattern Locked Banner (Setup Rush signature banner)
-                    AnimatedVisibility(
-                        visible = activeSetup != null,
-                        enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.92f),
-                        exit = fadeOut(animationSpec = tween(180)),
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = if (currentMission != null) 42.dp else 10.dp)
-                    ) {
-                        activeSetup?.let { setup ->
-                            val isBull = setup.dir == 1
-                            val badgeColor = if (isBull) theme.bull else theme.bear
+                    activeSetup?.let { setup ->
+                        val isBull = setup.dir == 1
+                        val badgeColor = if (isBull) theme.bull else theme.bear
 
-                            Surface(
-                                color = theme.bg.copy(alpha = 0.94f),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.75f)),
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp)
-                                    .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = badgeColor, spotColor = badgeColor)
+                        Surface(
+                            color = theme.bg.copy(alpha = 0.94f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.75f)),
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = if (currentMission != null) 42.dp else 10.dp)
+                                .padding(horizontal = 16.dp)
+                                .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = badgeColor, spotColor = badgeColor)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                Surface(
+                                    color = badgeColor,
+                                    shape = RoundedCornerShape(4.dp)
                                 ) {
-                                    Surface(
-                                        color = badgeColor,
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "⚡ PATTERN LOCKED · ×${max(1, streak)} STREAK",
-                                            color = if (theme.isLight) Color.White else Color.Black,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace,
-                                            letterSpacing = 1.sp,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
-                                        )
-                                    }
                                     Text(
-                                        text = setup.name.uppercase(),
-                                        color = theme.text,
-                                        fontSize = 15.sp,
+                                        text = "⚡ PATTERN LOCKED · ×${max(1, streak)} STREAK",
+                                        color = if (theme.isLight) Color.White else Color.Black,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = 1.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                    )
+                                }
+                                Text(
+                                    text = setup.name.uppercase(),
+                                    color = theme.text,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isBull) "BULLISH ▲" else "BEARISH ▼",
+                                        color = badgeColor,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace
                                     )
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = if (isBull) "BULLISH ▲" else "BEARISH ▼",
-                                            color = badgeColor,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = if (isBull) "HOLD BUY TO RIDE" else "HOLD SELL TO SHORT",
-                                            color = theme.text,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "${(setup.winRate * 100).toInt()}% WIN",
-                                            color = theme.muted,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
+                                    Text(
+                                        text = if (isBull) "HOLD BUY TO RIDE" else "HOLD SELL TO SHORT",
+                                        color = theme.text,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "${(setup.winRate * 100).toInt()}% WIN",
+                                        color = theme.muted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
                                 }
                             }
                         }
