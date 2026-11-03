@@ -11,7 +11,9 @@ import kotlin.math.*
  */
 class SetupEngine(
     seed: Long = 1337L,
-    val symbol: MarketSymbolCatalog.MarketSymbol = MarketSymbolCatalog.activeSymbol
+    val symbol: MarketSymbolCatalog.MarketSymbol = MarketSymbolCatalog.activeSymbol,
+    val targetSetupKey: String? = null,
+    val exclusiveMode: Boolean = false
 ) {
 
     val rng: () -> Double = mulberry32(seed)
@@ -31,9 +33,10 @@ class SetupEngine(
         candles.addAll(b.candles)
         // Seed initial setups along the starting tape
         if (candles.size > 15) {
-            appendSetup(atBar = 12)
-            if (candles.size > 40) {
-                appendSetup(atBar = 35)
+            val firstKey = if (exclusiveMode) targetSetupKey else targetSetupKey
+            appendSetup(preferredKey = firstKey, atBar = 12)
+            if (candles.size > 40 && !exclusiveMode) {
+                appendSetup(preferredKey = null, atBar = 35)
             }
         }
     }
@@ -42,7 +45,8 @@ class SetupEngine(
 
     /** Generates a valid trading setup record and sculpts authentic candlestick anatomy */
     fun appendSetup(preferredKey: String? = null, atBar: Int = max(0, candles.size - 1)) {
-        val chosen = (preferredKey?.let { StrategyCatalog.findStrategy(it) }
+        val effectiveKey = if (exclusiveMode && targetSetupKey != null) targetSetupKey else (preferredKey ?: targetSetupKey)
+        val chosen = (effectiveKey?.let { StrategyCatalog.findStrategy(it) }
             ?: StrategyCatalog.ALL_SETUPS[(rng() * StrategyCatalog.ALL_SETUPS.size).toInt().coerceIn(0, StrategyCatalog.ALL_SETUPS.size - 1)])
         
         val dir = when (chosen.bias) {
@@ -195,7 +199,8 @@ class SetupEngine(
             // Periodically trigger a new setup if tape has advanced
             val lastSetupAt = setups.lastOrNull()?.at ?: 0
             if (candles.size - lastSetupAt >= 25) {
-                appendSetup(preferredKey, atBar = candles.size - 6)
+                val nextKey = if (exclusiveMode && targetSetupKey != null) targetSetupKey else (preferredKey ?: targetSetupKey)
+                appendSetup(nextKey, atBar = candles.size - 6)
             }
         }
     }

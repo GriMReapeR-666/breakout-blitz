@@ -86,6 +86,10 @@ object OpponentDuelEngine {
 
     /** Start a competitive head-to-head match against a matched rival */
     fun startMatch(formatId: String = "1v1", playerMmr: Int = 2640) {
+        if (formatId == "solo" || formatId == "campaign" || formatId == "practice") {
+            endMatch()
+            return
+        }
         val selected = RIVAL_POOL.minByOrNull { abs(it.mmr - playerMmr) } ?: RIVAL_POOL.first()
         activeRival = selected.copy(
             status = RivalTradeStatus.FLAT,

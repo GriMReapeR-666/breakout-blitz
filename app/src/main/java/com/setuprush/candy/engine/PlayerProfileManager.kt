@@ -106,4 +106,20 @@ object PlayerProfileManager {
             )
         )
     }
+
+    fun resetCareerStats() {
+        currentProfile = currentProfile.copy(
+            stats = TradingPerformance(
+                totalTrades = 0,
+                profitableTrades = 0,
+                stoppedTrades = 0,
+                winRate = 0.0,
+                profitFactor = 0.0,
+                netPnl = 0.0,
+                avgRMultiple = 0.0,
+                bestStreak = 0,
+                currentStreak = 0
+            )
+        )
+    }
 }

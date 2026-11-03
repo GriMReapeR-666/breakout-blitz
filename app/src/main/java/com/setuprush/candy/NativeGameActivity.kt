@@ -140,6 +140,8 @@ fun NativeGameScreen(
     var currentLeverage by remember { mutableDoubleStateOf(2.0) }
     var lastOutcome by remember { mutableStateOf<String?>(null) }
     var isPaused by remember { mutableStateOf(false) }
+    var tapeSpeedMultiplier by remember { mutableFloatStateOf(1.0f) }
+    var isTapePaused by remember { mutableStateOf(false) }
 
     // Granular Indicator & Signal States
     var showIndicatorDialog by remember { mutableStateOf(false) }
@@ -185,40 +187,42 @@ fun NativeGameScreen(
     }
 
     // Continuous 60/120 Hz Physics & Camera Loop (Setup Rush mt & Ot parity)
-    LaunchedEffect(engine, currentLevel, isPaused) {
+    LaunchedEffect(engine, currentLevel, isPaused, isTapePaused, tapeSpeedMultiplier) {
         var prevNanos = 0L
         while (!isPaused) {
             withFrameNanos { nowNanos ->
                 if (prevNanos != 0L) {
                     val dt = ((nowNanos - prevNanos) / 1_000_000_000.0).coerceIn(0.001, 0.05)
-                    elapsedSeconds += dt
+                    if (!isTapePaused) {
+                        elapsedSeconds += dt
 
-                    // Leverage ramping physics (J.lev = min(20, 2 + elapsed * 0.09))
-                    currentLeverage = min(20.0, 2.0 + elapsedSeconds * 0.09)
+                        // Leverage ramping physics (J.lev = min(20, 2 + elapsed * 0.09))
+                        currentLeverage = min(20.0, 2.0 + elapsedSeconds * 0.09)
 
-                    // Continuous tape progression
-                    val baseSpeed = 1.1 + min(2.2, elapsedSeconds * 0.012)
-                    val speed = baseSpeed * currentLevel.speedMul
-                    val prevK = tapePosition
-                    tapePosition += dt * speed
+                        // Continuous tape progression at readable tactical speed
+                        val baseSpeed = 0.85 * tapeSpeedMultiplier
+                        val speed = baseSpeed * currentLevel.speedMul
+                        val prevK = tapePosition
+                        tapePosition += dt * speed
 
-                    // Camera follow update
-                    camera.update(
-                        k = tapePosition,
-                        candles = engine.candles,
-                        dt = dt,
-                        posEntry = if (isPlayerHolding) tradeEntryPrice else null
-                    )
+                        // Camera follow update
+                        camera.update(
+                            k = tapePosition,
+                            candles = engine.candles,
+                            dt = dt,
+                            posEntry = if (isPlayerHolding) tradeEntryPrice else null
+                        )
 
-                    // Ensure future candles exist ahead of tape
-                    val currentIdx = tapePosition.toInt()
-                    if (currentIdx + 18 > engine.candles.size) {
-                        engine.ensure(currentIdx, 25, activeStrategyKey)
-                    }
+                        // Ensure future candles exist ahead of tape
+                        val currentIdx = tapePosition.toInt()
+                        if (currentIdx + 18 > engine.candles.size) {
+                            engine.ensure(currentIdx, 25, activeStrategyKey)
+                        }
 
-                    // Intrabar candle close event
-                    if (floor(tapePosition).toInt() > floor(prevK).toInt()) {
-                        if (isPlayerHolding) bridge.vibrate("tick")
+                        // Intrabar candle close event
+                        if (floor(tapePosition).toInt() > floor(prevK).toInt()) {
+                            if (isPlayerHolding) bridge.vibrate("tick")
+                        }
                     }
 
                     // Check live setup progression & missed execution detection
@@ -251,6 +255,14 @@ fun NativeGameScreen(
                                 bridge.vibrate("liquidation")
                                 lastOutcome = "STOPPED OUT: -$${String.format("%.2f", abs(pnl))}"
                                 OpponentDuelEngine.recordPlayerStopLoss()
+                                StrategyMasteryManager.recordEvaluationTrade(
+                                    isWin = false,
+                                    rMultiple = -1.0,
+                                    pnl = pnl,
+                                    entryPrice = tradeEntryPrice,
+                                    exitPrice = curPrice,
+                                    timingGrade = "STOPPED_OUT"
+                                )
                                 activeStrategyKey?.let {
                                     StrategyMasteryManager.recordTrade(it, isWin = false)
                                 }
@@ -277,83 +289,107 @@ fun NativeGameScreen(
     Scaffold(
         containerColor = theme.bg,
         topBar = {
-            // Clean, Institutional Setup Rush Header HUD
+            // Clean, Institutional Setup Rush Header HUD (Guaranteed zero-overflow framing)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Top-Left Chamfered HUD Card (Balance, Streak, Win-Rate)
-                Surface(
-                    color = theme.bg.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, theme.bull.copy(alpha = 0.35f)),
-                    modifier = Modifier.padding(vertical = 2.dp)
+                // Top-Left: Career Bank & Tactile Reset Button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    Surface(
+                        color = theme.bg.copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, theme.bull.copy(alpha = 0.35f))
                     ) {
-                        Text(
-                            text = "CAREER BANK",
-                            color = theme.muted,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "$${String.format("%,.2f", totalScore)}",
-                                color = if (totalScore >= 10000.0) theme.bull else theme.bear,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
+                                text = "CAREER BANK",
+                                color = theme.muted,
+                                fontSize = 7.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
                             )
-                            if (streak > 1) {
-                                Surface(
-                                    color = Color(0xFFFF5A1F),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "×$streak 🔥",
-                                        color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "$${String.format("%,.2f", totalScore)}",
+                                    color = if (totalScore >= 10000.0) theme.bull else theme.bear,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                if (streak > 1) {
+                                    Surface(
+                                        color = Color(0xFFFF5A1F),
+                                        shape = RoundedCornerShape(3.dp)
+                                    ) {
+                                        Text(
+                                            text = "×$streak",
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
+                    }
+
+                    // Direct Account Balance Reset Button
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFFFF334B).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color(0xFFFF334B).copy(alpha = 0.6f)),
+                        modifier = Modifier.clickable {
+                            totalScore = 10000.0
+                            streak = 0
+                            playerTakesCount = 0
+                            playerStopsCount = 0
+                            StrategyMasteryManager.resetEvaluation()
+                            PlayerProfileManager.resetCareerStats()
+                            bridge.vibrate("tick")
+                            lastOutcome = "ACCOUNT RESET TO $10,000.00 · READY"
+                        }
+                    ) {
                         Text(
-                            text = "LEV ${currentLeverage.toInt()}× · ${playerTakesCount + playerStopsCount} RIDES (${if (playerTakesCount + playerStopsCount > 0) ((playerTakesCount.toDouble() / (playerTakesCount + playerStopsCount)) * 100).toInt() else 0}% WIN)",
-                            color = theme.muted,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = FontFamily.Monospace
+                            text = "🔄 RESET",
+                            color = Color(0xFFFF5268),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
                         )
                     }
                 }
 
-                // Top-Center Market Symbol & Session Killzone Badge
+                // Top-Center: Market Symbol Badge
                 Surface(
                     color = theme.bg.copy(alpha = 0.90f),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.35f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.dp)
                                 .clip(CircleShape)
                                 .background(theme.bull)
                         )
@@ -364,74 +400,51 @@ fun NativeGameScreen(
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace
                         )
-                        Text(
-                            text = "· ${activeSymbol.badge}",
-                            color = theme.muted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
                     }
                 }
 
-                // Top-Right Quick Controls (Timer, Theme, Indicators, Menu)
+                // Top-Right: Speed/Pause Pill, Theme, & Tactical HQ Menu
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    // Match Timer Pill
+                    // Speed & Pause Toggle Pill
                     Surface(
-                        color = theme.bg.copy(alpha = 0.92f),
                         shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.25f))
-                    ) {
-                        val minutes = (elapsedSeconds / 60).toInt()
-                        val seconds = (elapsedSeconds % 60).toInt()
-                        Text(
-                            text = String.format("%02d:%02d", minutes, seconds),
-                            color = theme.text,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    // Quick Theme Cycle
-                    IconButton(
-                        onClick = {
-                            val next = ThemeManager.cycleNext()
-                            bridge.vibrate("tick")
-                            lastOutcome = "THEME: ${next.name.uppercase()}"
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Text("🎨", fontSize = 14.sp)
-                    }
-
-                    // Quick Indicators Toggle
-                    Surface(
-                        color = theme.grid.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(6.dp),
+                        color = if (isTapePaused) Color(0xFFFFC700).copy(alpha = 0.25f) else theme.grid.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (isTapePaused) Color(0xFFFFC700) else theme.grid.copy(alpha = 0.4f)),
                         modifier = Modifier.clickable {
-                            showIndicatorDialog = true
+                            if (!isTapePaused && tapeSpeedMultiplier == 1.0f) {
+                                tapeSpeedMultiplier = 0.5f
+                                lastOutcome = "SPEED: 0.5× (SLOW DELIBERATE)"
+                            } else if (!isTapePaused && tapeSpeedMultiplier == 0.5f) {
+                                tapeSpeedMultiplier = 2.0f
+                                lastOutcome = "SPEED: 2.0× (TURBO)"
+                            } else if (!isTapePaused && tapeSpeedMultiplier == 2.0f) {
+                                isTapePaused = true
+                                lastOutcome = "TAPE PAUSED · ANALYZE SETUP"
+                            } else {
+                                isTapePaused = false
+                                tapeSpeedMultiplier = 1.0f
+                                lastOutcome = "SPEED: 1.0× (TACTICAL SPEED)"
+                            }
                             bridge.vibrate("tick")
                         }
                     ) {
                         Text(
-                            text = "⚡$activeIndCount/4",
-                            color = theme.text,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = if (isTapePaused) "⏸ PAUSED" else "▶ ${tapeSpeedMultiplier}×",
+                            color = if (isTapePaused) Color(0xFFFFC700) else theme.text,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp)
                         )
                     }
 
                     // Tactical HQ Menu / Return Button
                     Surface(
                         color = if (showMasterMenuHub) Color(0xFF1E2838) else Color(0xFFFFC700).copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, if (showMasterMenuHub) Color(0xFF384556) else Color(0xFFFFC700)),
                         modifier = Modifier.clickable {
                             showMasterMenuHub = !showMasterMenuHub
@@ -439,13 +452,17 @@ fun NativeGameScreen(
                         }
                     ) {
                         Text(
-                            text = if (showMasterMenuHub) "▶ GAME" else "◀ HQ MENU",
+                            text = if (showMasterMenuHub) "▶ GAME" else "◀ HQ",
                             color = if (showMasterMenuHub) Color.White else Color(0xFFFFC700),
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         )
+                    }
+                }
+            }
+        }
                     }
                 }
             }
@@ -486,9 +503,23 @@ fun NativeGameScreen(
         val performCashOut = {
             if (isPlayerHolding) {
                 val pnl = livePnl
+                val isWin = pnl > 0
+                val rMult = if (isWin) 2.0 else -1.0
+                val exitP = currentPrice
                 isPlayerHolding = false
                 totalScore += pnl
-                if (pnl > 0) {
+
+                // Record into Strategy Mastery 5-Trade Evaluation Series
+                val eval = StrategyMasteryManager.recordEvaluationTrade(
+                    isWin = isWin,
+                    rMultiple = rMult,
+                    pnl = pnl,
+                    entryPrice = tradeEntryPrice,
+                    exitPrice = exitP,
+                    timingGrade = "CLEAN"
+                )
+
+                if (isWin) {
                     streak++
                     playerTakesCount++
                     bridge.vibrate("cash_out")
@@ -515,6 +546,15 @@ fun NativeGameScreen(
                     val mission = StrategyMasteryManager.activeMission
                     if (mission != null) {
                         lastOutcome = "MISSION ${mission.levelId} FAILED: -$${String.format("%.2f", abs(pnl))} · RETRY"
+                    }
+                }
+
+                // Announce Series Evaluation Outcome
+                if (eval != null && eval.completedCount >= 5) {
+                    if (eval.isPassed) {
+                        lastOutcome = "🎉 3-STAR GRANDMASTER MASTERY CERTIFIED! (${eval.winCount}/5 WINS · +${String.format("%.1f", eval.netR)}R)"
+                    } else {
+                        lastOutcome = "SERIES ENDED: ${eval.winCount}/5 WINS · +${String.format("%.1f", eval.netR)}R (REQUIRES 3+ WINS & +3.0R)"
                     }
                 }
 
@@ -546,24 +586,31 @@ fun NativeGameScreen(
                     activeSymbol = sym
                     TradingModelManager.activeTradingModel = model
                     activeStrategyKey = model.setupKey
-                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym)
-                    engine.appendSetup(model.setupKey, atBar = 16)
+                    val isSolo = (formatId == "solo")
+                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym, targetSetupKey = model.setupKey, exclusiveMode = isSolo)
                     tapePosition = 10.0
                     isPlayerHolding = false
                     SetupExecutionTimingEngine.resetStats()
-                    OpponentDuelEngine.startMatch(formatId, PlayerProfileManager.currentProfile.mmrRating)
+                    if (isSolo) {
+                        OpponentDuelEngine.endMatch()
+                        StrategyMasteryManager.startEvaluation(model.setupKey)
+                    } else {
+                        OpponentDuelEngine.startMatch(formatId, PlayerProfileManager.currentProfile.mmrRating)
+                        StrategyMasteryManager.resetEvaluation()
+                    }
                     showMasterMenuHub = false
-                    showPreMatchShowcase = true
-                    lastOutcome = "COMMENCED ${formatId.uppercase()}: ${sym.id}"
+                    showPreMatchShowcase = !isSolo
+                    lastOutcome = "COMMENCED ${formatId.uppercase()}: ${sym.id} | SETUP: ${model.setupKey.uppercase()}"
                 },
                 onOpenAcademyDrill = { setup, tier ->
                     StrategyMasteryManager.activeMission = null
                     activeStrategyKey = setup.key
-                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = activeSymbol)
-                    engine.appendSetup(setup.key, atBar = 16)
+                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = activeSymbol, targetSetupKey = setup.key, exclusiveMode = true)
                     tapePosition = 10.0
                     isPlayerHolding = false
                     SetupExecutionTimingEngine.resetStats()
+                    OpponentDuelEngine.endMatch()
+                    StrategyMasteryManager.startEvaluation(setup.key)
                     if (tier >= 4) {
                         currentLevel = DeskLevel.DESK_3
                     }
@@ -576,11 +623,12 @@ fun NativeGameScreen(
                     val sym = MarketSymbolCatalog.findSymbol(mission.symbolId) ?: activeSymbol
                     activeSymbol = sym
                     currentLeverage = mission.defaultLeverage
-                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym)
-                    engine.appendSetup(mission.targetSetupKey, atBar = 16)
+                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym, targetSetupKey = mission.targetSetupKey, exclusiveMode = true)
                     tapePosition = 10.0
                     isPlayerHolding = false
                     SetupExecutionTimingEngine.resetStats()
+                    OpponentDuelEngine.endMatch()
+                    StrategyMasteryManager.startEvaluation(mission.targetSetupKey)
                     showMasterMenuHub = false
                     lastOutcome = "OPERATION LAUNCHED: ${mission.callsign} | CATCH ${mission.targetSetupKey.uppercase()}"
                 },
@@ -623,116 +671,113 @@ fun NativeGameScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // 1b. Tactical Solo Campaign Mission Objective HUD Banner
-                    val currentMission = StrategyMasteryManager.activeMission
-                    if (currentMission != null) {
-                        Surface(
-                            color = Color(0xFF131924).copy(alpha = 0.95f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.2.dp, Color(0xFFFFC700)),
+                    // 1b. Unified Docked In-Game Cockpit Info Strip (Zero-Overlap Framing)
+                    Surface(
+                        color = Color(0xFF090D14).copy(alpha = 0.94f),
+                        shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1E2838)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Row(
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 4.dp, start = 14.dp, end = 14.dp)
-                                .shadow(6.dp, RoundedCornerShape(8.dp), spotColor = Color(0xFFFFC700))
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Left: Mission / Solo Strategy Indicator
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text("🎯", fontSize = 13.sp)
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val currentMission = StrategyMasteryManager.activeMission
+                                if (currentMission != null) {
+                                    Surface(
+                                        color = Color(0xFFFFC700),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
                                         Text(
-                                            text = "OP ${currentMission.levelId}: ${currentMission.callsign}",
-                                            color = Color(0xFFFFC700),
-                                            fontSize = 11.sp,
+                                            text = "OP ${currentMission.levelId}",
+                                            color = Color.Black,
+                                            fontSize = 9.sp,
                                             fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "· ${currentMission.targetBias} [${currentMission.targetSetupKey.uppercase()}]",
-                                            color = Color(0xFF00E5FF),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                         )
                                     }
                                     Text(
-                                        text = "${currentMission.briefing} · CATCH MOVE TO REACH +2R TAKE PROFIT",
-                                        color = Color(0xFF8A99AD),
-                                        fontSize = 8.5.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. Mid-Upper Pattern Locked Banner (Setup Rush signature banner)
-                    activeSetup?.let { setup ->
-                        val isBull = setup.dir == 1
-                        val badgeColor = if (isBull) theme.bull else theme.bear
-
-                        Surface(
-                            color = theme.bg.copy(alpha = 0.94f),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.75f)),
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = if (currentMission != null) 42.dp else 10.dp)
-                                .padding(horizontal = 16.dp)
-                                .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = badgeColor, spotColor = badgeColor)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Surface(
-                                    color = badgeColor,
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "⚡ PATTERN LOCKED · ×${max(1, streak)} STREAK",
-                                        color = if (theme.isLight) Color.White else Color.Black,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        letterSpacing = 1.sp,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
-                                    )
-                                }
-                                Text(
-                                    text = setup.name.uppercase(),
-                                    color = theme.text,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (isBull) "BULLISH ▲" else "BEARISH ▼",
-                                        color = badgeColor,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = if (isBull) "HOLD BUY TO RIDE" else "HOLD SELL TO SHORT",
-                                        color = theme.text,
-                                        fontSize = 11.sp,
+                                        text = "${currentMission.callsign} [${currentMission.targetSetupKey.uppercase()}]",
+                                        color = Color(0xFF00E5FF),
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace
                                     )
+                                } else if (activeStrategyKey != null) {
+                                    Surface(
+                                        color = Color(0xFF00E5FF),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "SOLO GRIND",
+                                            color = Color.Black,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
                                     Text(
-                                        text = "${(setup.winRate * 100).toInt()}% WIN",
+                                        text = activeStrategyKey!!.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                } else {
+                                    Text(
+                                        text = "⚡ DESK COMBAT · ALL SETUPS",
                                         color = theme.muted,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            // Right: Setup Radar Alert & Mastery 5-Trade Series Tracker
+                            val evaluation = StrategyMasteryManager.activeEvaluation
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (activeSetup != null) {
+                                    val isBull = activeSetup.dir == 1
+                                    val badgeColor = if (isBull) theme.bull else theme.bear
+                                    Surface(
+                                        color = badgeColor.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(4.dp),
+                                        border = BorderStroke(1.dp, badgeColor)
+                                    ) {
+                                        Text(
+                                            text = if (isBull) "▲ LONG TRIGGER" else "▼ SHORT TRIGGER",
+                                            color = badgeColor,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                        )
+                                    }
+                                }
+
+                                if (evaluation != null) {
+                                    Text(
+                                        text = "${evaluation.completedCount}/5 · ${(evaluation.winRate * 100).toInt()}% WIN · ${if (evaluation.netR >= 0) "+" else ""}${String.format("%.1f", evaluation.netR)}R",
+                                        color = if (evaluation.winRate >= 0.6) Color(0xFF00E676) else Color(0xFFFFC700),
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace
                                     )
                                 }
@@ -740,13 +785,13 @@ fun NativeGameScreen(
                         }
                     }
 
-                    // 3. Competitive Opponent Radar (if duel is active)
-                    if (OpponentDuelEngine.isCompetitiveActive) {
+                    // 3. Competitive Opponent Radar (ONLY during PvP 1v1 duels, never during solo grind)
+                    if (OpponentDuelEngine.isCompetitiveActive && StrategyMasteryManager.activeMission == null && activeStrategyKey == null) {
                         OpponentRadarHUD(
                             theme = theme,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(top = 70.dp, end = 12.dp)
+                                .padding(top = 42.dp, end = 10.dp)
                         )
                     }
 

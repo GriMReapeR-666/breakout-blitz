@@ -303,4 +303,81 @@ object StrategyMasteryManager {
         progressMap[key] = updated
         return updated
     }
+
+    // ==================== 5-TRADE SERIES MASTERY EVALUATION PROTOCOL ====================
+
+    data class MasteryTradeRecord(
+        val tradeNumber: Int,
+        val isWin: Boolean,
+        val rMultiple: Double,
+        val pnl: Double,
+        val entryPrice: Double,
+        val exitPrice: Double,
+        val timingGrade: String
+    )
+
+    data class StrategyMasteryEvaluation(
+        val strategyKey: String,
+        val seriesTargetTrades: Int = 5,
+        val trades: MutableList<MasteryTradeRecord> = mutableListOf(),
+        var isPassed: Boolean = false,
+        var awardedStars: Int = 0
+    ) {
+        val completedCount: Int get() = trades.size
+        val winCount: Int get() = trades.count { it.isWin }
+        val lossCount: Int get() = trades.count { !it.isWin }
+        val winRate: Double get() = if (trades.isEmpty()) 0.0 else winCount.toDouble() / trades.size
+        val netR: Double get() = trades.sumOf { it.rMultiple }
+        val grossProfit: Double get() = trades.filter { it.isWin }.sumOf { it.pnl }
+        val grossLoss: Double get() = trades.filter { !it.isWin }.sumOf { kotlin.math.abs(it.pnl) }
+        val profitFactor: Double get() = if (grossLoss == 0.0) (if (grossProfit > 0) 9.99 else 0.0) else grossProfit / grossLoss
+
+        val meetsCertification: Boolean
+            get() = trades.size >= seriesTargetTrades && winRate >= 0.60 && netR >= 3.0 && profitFactor >= 2.0
+    }
+
+    var activeEvaluation: StrategyMasteryEvaluation? = null
+
+    fun startEvaluation(strategyKey: String): StrategyMasteryEvaluation {
+        val eval = StrategyMasteryEvaluation(strategyKey = strategyKey)
+        activeEvaluation = eval
+        return eval
+    }
+
+    fun recordEvaluationTrade(
+        isWin: Boolean,
+        rMultiple: Double,
+        pnl: Double,
+        entryPrice: Double,
+        exitPrice: Double,
+        timingGrade: String = "CLEAN"
+    ): StrategyMasteryEvaluation? {
+        val eval = activeEvaluation ?: return null
+        val tradeNum = eval.trades.size + 1
+        eval.trades.add(
+            MasteryTradeRecord(
+                tradeNumber = tradeNum,
+                isWin = isWin,
+                rMultiple = rMultiple,
+                pnl = pnl,
+                entryPrice = entryPrice,
+                exitPrice = exitPrice,
+                timingGrade = timingGrade
+            )
+        )
+        if (eval.trades.size >= eval.seriesTargetTrades) {
+            eval.isPassed = eval.meetsCertification
+            eval.awardedStars = if (eval.winRate >= 0.8 && eval.netR >= 4.0) 3 else if (eval.winRate >= 0.6) 2 else 1
+            if (eval.isPassed) {
+                recordTrade(eval.strategyKey, isWin = true, rMultiple = 3.0)
+                availableSkillPoints += 2
+                MonetizationManager.addCredits(300)
+            }
+        }
+        return eval
+    }
+
+    fun resetEvaluation() {
+        activeEvaluation = null
+    }
 }
