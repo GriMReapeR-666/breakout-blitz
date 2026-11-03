@@ -30,11 +30,30 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        run: |
+          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Report Build Logs to Summary
+        if: always()
+        run: |
+          if [ -f build.log ]; then
+            echo "### Gradle Build Log" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Installable APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: BreakoutBlitz-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Failure-Log
+          path: build.log
