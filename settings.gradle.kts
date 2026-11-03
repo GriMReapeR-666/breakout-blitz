@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SetupCandy"
+rootProject.name = "BacktestBlitz"
 include(":app")

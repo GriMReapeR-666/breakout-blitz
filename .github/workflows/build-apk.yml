@@ -1,4 +1,4 @@
-name: Build Setup Candy APK
+name: Build Backtest Blitz APK
 
 on:
   push:
@@ -37,6 +37,6 @@ jobs:
       - name: Upload Installable APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SetupCandy-Debug-APK
+          name: BacktestBlitz-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30

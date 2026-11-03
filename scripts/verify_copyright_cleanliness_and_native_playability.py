@@ -90,8 +90,8 @@ def main():
     strings_path = os.path.join(app_dir, "res", "values", "strings.xml")
     with open(strings_path, "r", encoding="utf-8") as f:
         strings_text = f.read()
-    clean_app_name = '<string name="app_name">Setup Candy</string>' in strings_text
-    results.append(test_check("8. Clean app name verified: 'Setup Candy'", clean_app_name))
+    clean_app_name = '<string name="app_name">Backtest Blitz</string>' in strings_text
+    results.append(test_check("8. Clean app name verified: 'Backtest Blitz'", clean_app_name))
     
     print("================================================================================")
     if all(results):

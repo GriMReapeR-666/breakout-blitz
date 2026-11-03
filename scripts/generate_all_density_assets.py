@@ -138,7 +138,7 @@ def create_feature_graphic(width: int = 1024, height: int = 500) -> Image.Image:
         draw.rounded_rectangle([c_x - 10, c_y - 18, c_x + 10, c_y + 18], radius=4, fill=c_col)
 
     # Tactical HUD Overlay Text
-    draw.text((80, 80), "SETUP CANDY", fill=(255, 255, 255, 255))
+    draw.text((80, 80), "BACKTEST BLITZ", fill=(255, 255, 255, 255))
     draw.text((80, 120), "TACTICAL TRADING SIMULATOR · ULTRA-FLUID NATIVE ENGINE", fill=(0, 230, 118, 255))
     draw.text((80, 150), "COMMUNITY TOP INDICATORS · PRO DUEL ARENA · ZERO GAMBLING SIMULATION", fill=(160, 175, 200, 255))
 
