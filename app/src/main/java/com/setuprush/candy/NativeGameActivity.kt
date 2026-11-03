@@ -227,6 +227,7 @@ fun NativeGameScreen(
 
                     // Check live setup progression & missed execution detection
                     if (engine.candles.isNotEmpty()) {
+                        val currentIdx = tapePosition.toInt()
                         val curPrice = SetupEngine.priceAt(engine.candles, tapePosition)
                         val activeSetup = engine.setups.lastOrNull()
 
