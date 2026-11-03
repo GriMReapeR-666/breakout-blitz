@@ -636,7 +636,7 @@ fun ArsenalPresetsContent(
     onModelUpdated: (TradingModelManager.CustomTradingModel) -> Unit
 ) {
     val prog = StrategyMasteryManager.getProgress(activeModel.setupKey)
-    val perks = StrategyMasteryManager.getPerksForStrategy(activeModel.setupKey)
+    val benchmarks = StrategyMasteryManager.getTraderSkillBenchmarks(activeModel.setupKey)
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -857,7 +857,7 @@ fun ArsenalPresetsContent(
                     ) {
                         listOf(2.0, 5.0, 10.0, 25.0, 50.0).forEach { lev ->
                             val isLev = activeModel.leverage == lev
-                            val isLocked = lev == 50.0 && prog.tier < 5
+                            val isLocked = false // Pure trading: trader controls their own leverage
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = if (isLev) deskCyan.copy(alpha = 0.25f) else Color(0xFF1B2332),
@@ -969,28 +969,30 @@ fun ArsenalPresetsContent(
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("UNLOCKED STRATEGY PERKS (EARNED VIA MASTERY):", color = deskMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        perks.forEach { perk ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Text("REAL TRADER SKILL BENCHMARKS (NO ARTIFICIAL RPG PERKS):", color = deskMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        benchmarks.forEach { b ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF1B2332),
+                                border = BorderStroke(0.5.dp, deskBorder),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(if (perk.isUnlocked) perk.icon else "🔒", fontSize = 11.sp)
-                                Text(
-                                    text = "T${perk.tier}: ${perk.title}",
-                                    color = if (perk.isUnlocked) Color.White else deskMuted,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "— ${perk.description}",
-                                    color = deskMuted,
-                                    fontSize = 8.5.sp,
-                                    maxLines = 1
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(b.icon, fontSize = 13.sp)
+                                        Column {
+                                            Text(b.title, color = Color.White, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                                            Text(b.description, color = deskMuted, fontSize = 8.sp)
+                                        }
+                                    }
+                                    Text(b.valueText, color = deskCyan, fontSize = 9.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                                }
                             }
                         }
                     }
@@ -1134,6 +1136,46 @@ fun JournalCareerContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
+        // Setup Rush LuxAlgo Edge Score Banner
+        item {
+            val edgeScore = MatchPerformanceEngine.computeEdgeScore(overallWinRate, 2.40, 4)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.5.dp, deskGold),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("⚡", fontSize = 14.sp)
+                            Text("SETUP RUSH EDGE SCORE", color = deskGold, fontSize = 11.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                        }
+                        Text("Calculated from win rate, profit factor & risk discipline", color = deskMuted, fontSize = 8.5.sp)
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = deskGold.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, deskGold)
+                    ) {
+                        Text(
+                            text = "$edgeScore / 100",
+                            color = deskGold,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         // Career Performance Metrics Cards
         item {
             Text(
@@ -1477,7 +1519,7 @@ fun StoreContent(theme: GameTheme) {
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("👑 COMBINE ALLOCATION PASS", color = deskGold, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    Text("5,000 Credits + Golden Candlestick Theme + Instant 50x Max Leverage", color = deskMuted, fontSize = 9.sp)
+                    Text("5,000 Credits + Golden Candlestick Theme (Purely Virtual Credits & Chart Aesthetics)", color = deskMuted, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Button(
                         onClick = {

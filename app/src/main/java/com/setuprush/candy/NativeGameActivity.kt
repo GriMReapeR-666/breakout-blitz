@@ -161,6 +161,7 @@ fun NativeGameScreen(
     var showMasteryTutorialDialog by remember { mutableStateOf(false) }
     var showPostMatchDebriefDialog by remember { mutableStateOf(false) }
     val sessionTradeReviews = remember { mutableStateListOf<MatchPerformanceEngine.TradeReviewRecord>() }
+    var peakRidePnl by remember { mutableDoubleStateOf(0.0) }
 
     var currentMode by remember { mutableStateOf(GameMode.PRO) }
     var currentLevel by remember { mutableStateOf(DeskLevel.DESK_2) }
@@ -182,6 +183,7 @@ fun NativeGameScreen(
             val margin = 1000.0
             val notional = margin * currentLeverage
             livePnl = SetupEngine.ridePnl(activeDirection, tradeEntryPrice, currentPrice, notional = notional)
+            if (livePnl > peakRidePnl) peakRidePnl = livePnl
         } else {
             livePnl = 0.0
         }
@@ -487,6 +489,7 @@ fun NativeGameScreen(
                 isPlayerHolding = true
                 activeDirection = 1
                 tradeEntryPrice = startP
+                peakRidePnl = 0.0
                 bridge.vibrate("hold_long")
                 val fb = SetupExecutionTimingEngine.evaluateEntry(
                     activeSetup = activeSetup,
@@ -503,6 +506,7 @@ fun NativeGameScreen(
                 isPlayerHolding = true
                 activeDirection = -1
                 tradeEntryPrice = startP
+                peakRidePnl = 0.0
                 bridge.vibrate("slide_short")
                 val fb = SetupExecutionTimingEngine.evaluateEntry(
                     activeSetup = activeSetup,
@@ -532,28 +536,31 @@ fun NativeGameScreen(
                     timingGrade = "CLEAN"
                 )
 
-                // Record into Trade Review Ledger
+                // Setup Rush MFE Capture Ratio Calculation (from journal.js: r.cap < 0.3)
+                val captureRatio = if (peakRidePnl > 0) (pnl / peakRidePnl).coerceIn(0.0, 1.0) else 1.0
                 val timingGrade = SetupExecutionTimingEngine.currentFeedback?.grade ?: SetupExecutionTimingEngine.ExecutionTimingGrade.GOOD_ENTRY
+                val isCutEarly = isWin && captureRatio < 0.35 && peakRidePnl >= 120.0
+
                 val mistakeCat = when {
                     !isWin && timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.LATE_ENTRY -> MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY
                     !isWin && timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.FOMO_EARLY -> MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY
                     !isWin -> MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP
-                    isWin && pnl < 100.0 -> MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT
+                    isCutEarly -> MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT
                     else -> MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS
                 }
                 val diag = when (mistakeCat) {
                     MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY -> "Entered late after market expansion; unfavorable risk:reward."
                     MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY -> "Entered before setup confirmation closed; trapped on false wick."
-                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Cashed out at +0.5R, leaving +1.5R on the table."
+                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Cut winner early: captured only ${(captureRatio * 100).toInt()}% of expansion (+${String.format("%.2f", pnl)} of +${String.format("%.2f", peakRidePnl)} peak)."
                     MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP -> "Disciplined exit; loss contained to planned 1.0R risk."
                     MatchPerformanceEngine.MistakeCategory.STOP_LOSS_IGNORED -> "Drawdown exceeded planned invalidation."
                     MatchPerformanceEngine.MistakeCategory.COUNTER_TREND -> "Executed counter to higher timeframe momentum."
-                    MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Clean execution and disciplined exit at target."
+                    MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Optimal execution and disciplined exit at target."
                 }
                 val sol = when (mistakeCat) {
                     MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY -> "Never chase. Wait for the retest pullback into the zone or pass."
                     MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY -> "Wait for candle confirmation close before entering."
-                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Shift stop to breakeven at +1R and hold for the full target."
+                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Shift stop to breakeven at +1R and let it expand to the +2.0R target."
                     MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP -> "Taking small planned losses is normal. Prepare for next setup."
                     MatchPerformanceEngine.MistakeCategory.STOP_LOSS_IGNORED -> "Cut losses immediately at invalidation price."
                     MatchPerformanceEngine.MistakeCategory.COUNTER_TREND -> "Align entries with the Tactical Confirmation Trigger."

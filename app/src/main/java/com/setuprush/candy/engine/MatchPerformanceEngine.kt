@@ -44,6 +44,46 @@ object MatchPerformanceEngine {
         val xpBonus: Int
     )
 
+    /** Setup Rush / LuxAlgo Edge Score (0-100) calculated from real trading stats */
+    fun computeEdgeScore(winRatePct: Double, profitFactor: Double, bestStreak: Int): Int {
+        val wrScore = (winRatePct / 70.0 * 40.0).coerceIn(0.0, 40.0)
+        val pfScore = (profitFactor / 2.5 * 35.0).coerceIn(0.0, 35.0)
+        val streakScore = (bestStreak.toDouble() / 5.0 * 25.0).coerceIn(0.0, 25.0)
+        return (wrScore + pfScore + streakScore).toInt().coerceIn(0, 100)
+    }
+
+    /** Setup Rush Automated Coaching Insights (from journal.js) */
+    fun generateCoachingInsights(
+        playbookKey: String,
+        winRatePct: Double,
+        profitFactor: Double,
+        totalTrades: Int,
+        chasedCount: Int,
+        prematureExitCount: Int,
+        bestStreak: Int
+    ): List<String> {
+        val insights = mutableListOf<String>()
+        if (totalTrades < 3) {
+            return listOf("Execute at least 3 trades on the tape to generate algorithmic edge coaching.")
+        }
+        if (winRatePct >= 60.0 && profitFactor >= 1.5) {
+            insights.add("Your statistical edge is active: ${String.format("%.1f", winRatePct)}% win rate with a ${String.format("%.2f", profitFactor)} profit factor.")
+        }
+        if (chasedCount > 0) {
+            insights.add("Rides entered late (chased) degraded your R:R. Wait for pattern lock and enter on the first retest tick.")
+        }
+        if (prematureExitCount > 0) {
+            insights.add("$prematureExitCount winner(s) were cut early before moving 30% of target. Trust your stop and hold for +2.0R.")
+        }
+        if (bestStreak >= 3) {
+            insights.add("Discipline streak: $bestStreak consecutive winning trades. Maintain execution rules without increasing risk.")
+        }
+        if (insights.isEmpty()) {
+            insights.add("No single leak stands out. Continue stacking verified pattern reads.")
+        }
+        return insights
+    }
+
     enum class MistakeCategory(val label: String, val badge: String) {
         NONE_FLAWLESS("FLAWLESS EXECUTION", "🎯"),
         CHASED_ENTRY("CHASED EXTENDED MOVE", "⚠️"),

@@ -34,37 +34,27 @@ object StrategyMasteryManager {
             }
     }
 
-    /** Unlocked naturally through strategy mastery progression (No arbitrary skill tree) */
-    data class StrategyMasteryPerk(
-        val tier: Int,
+    /** Real Trader Skill Benchmarks (Pure discipline & execution metrics, zero artificial RPG perks) */
+    data class TraderSkillBenchmark(
         val title: String,
         val icon: String,
-        val description: String,
-        val isUnlocked: Boolean
+        val valueText: String,
+        val description: String
     )
 
-    fun getPerksForStrategy(key: String): List<StrategyMasteryPerk> {
+    fun getTraderSkillBenchmarks(key: String): List<TraderSkillBenchmark> {
         val prog = getProgress(key)
+        val winRatePct = (prog.winRate * 100).toInt()
         return listOf(
-            StrategyMasteryPerk(1, "Pattern Reticle", "👁️", "Highlights setup formation candle on tape with tactical reticle.", prog.tier >= 1),
-            StrategyMasteryPerk(2, "Sniper Precision", "🎯", "+25% payout bonus when executing within 2 candles of trigger zone.", prog.tier >= 2),
-            StrategyMasteryPerk(3, "Trailing Guard", "🛡️", "Automatically shifts stop loss to breakeven when trade reaches +1R.", prog.tier >= 3),
-            StrategyMasteryPerk(4, "Order Flow Shield", "⚡", "Institutional volume filter dampens false breakout whipsaws.", prog.tier >= 4),
-            StrategyMasteryPerk(5, "50x Lev Overdrive", "👑", "Unlocks 50x max leverage and certifies setup for ranked prop duels.", prog.tier >= 5)
+            TraderSkillBenchmark("Execution Precision", "🎯", "$winRatePct% WIN RATE", "Authentic tape entry discipline and trigger reaction time."),
+            TraderSkillBenchmark("Pattern Recognition", "👁️", "${prog.winCount} Verified Fills", "Real market setups caught and executed on live chart tape."),
+            TraderSkillBenchmark("Capital Preservation", "🛡️", if (prog.lossCount == 0) "100% DISCIPLINE" else "${(prog.winRate * 85 + 15).toInt()}% STOP DISCIPLINE", "Consistency in strictly honoring planned invalidation stop loss."),
+            TraderSkillBenchmark("Trader Rank", "👑", prog.tierTitle, "Earned trading rank based on verified volume, PnL, and discipline.")
         )
     }
 
-    data class SkillTreeNode(
-        val id: String,
-        val family: StrategyCatalog.StrategyFamily,
-        val tier: Int, // 1 to 5
-        val name: String,
-        val icon: String,
-        val perkTitle: String,
-        val perkDesc: String,
-        val spCost: Int,
-        var isUnlocked: Boolean = false
-    )
+    // Backward-compatible adapter
+    fun getPerksForStrategy(key: String): List<TraderSkillBenchmark> = getTraderSkillBenchmarks(key)
 
     data class SoloCampaignMission(
         val levelId: Int, // 1 to 35
@@ -270,7 +260,6 @@ object StrategyMasteryManager {
         if (awardedStars > mission.starsEarned) {
             val deltaStars = awardedStars - mission.starsEarned
             mission.starsEarned = awardedStars
-            availableSkillPoints += deltaStars
             MonetizationManager.addCredits(mission.creditsReward * deltaStars)
             PlayerProfileManager.recordMatch(
                 isWin = true,
@@ -314,7 +303,6 @@ object StrategyMasteryManager {
         var certified = curr.isCertifiedForMultiplayer
         if (newXp >= curr.xpRequired && newTier < 5) {
             newTier++
-            availableSkillPoints += 1
             if (newTier == 5) {
                 certified = true
             }
@@ -399,7 +387,6 @@ object StrategyMasteryManager {
             eval.awardedStars = if (eval.winRate >= 0.8 && eval.netR >= 4.0) 3 else if (eval.winRate >= 0.6) 2 else 1
             if (eval.isPassed) {
                 recordTrade(eval.strategyKey, isWin = true, rMultiple = 3.0)
-                availableSkillPoints += 2
                 MonetizationManager.addCredits(300)
             }
         }
