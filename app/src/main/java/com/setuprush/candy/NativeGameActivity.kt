@@ -148,8 +148,8 @@ fun NativeGameScreen(
     val emaCrossEnabled = activeIndicatorIds.contains("emacross")
     val patternLockEnabled = true
 
-    // Master Dialogs State
-    var showMasterMenuHub by remember { mutableStateOf(false) }
+    // Master Dialogs State (Defaults to true to show CODM-style Tactical Menu Hub on start)
+    var showMasterMenuHub by remember { mutableStateOf(true) }
     var showPreMatchShowcase by remember { mutableStateOf(false) }
     var pendingFormatId by remember { mutableStateOf("deathmatch_1v1") }
     var showModeStrategyDialog by remember { mutableStateOf(false) }
@@ -426,19 +426,23 @@ fun NativeGameScreen(
                         )
                     }
 
-                    // Master Menu / Pause Button
-                    Button(
-                        onClick = { showMasterMenuHub = !showMasterMenuHub },
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.bull.copy(alpha = 0.22f)),
+                    // Tactical HQ Menu / Return Button
+                    Surface(
+                        color = if (showMasterMenuHub) Color(0xFF1E2838) else Color(0xFFFFC700).copy(alpha = 0.18f),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        border = BorderStroke(1.dp, if (showMasterMenuHub) Color(0xFF384556) else Color(0xFFFFC700)),
+                        modifier = Modifier.clickable {
+                            showMasterMenuHub = !showMasterMenuHub
+                            bridge.vibrate("tick")
+                        }
                     ) {
                         Text(
-                            text = if (showMasterMenuHub) "BACK" else "⚙️ MENU",
-                            color = theme.bull,
+                            text = if (showMasterMenuHub) "▶ GAME" else "◀ HQ MENU",
+                            color = if (showMasterMenuHub) Color.White else Color(0xFFFFC700),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                         )
                     }
                 }
@@ -754,134 +758,24 @@ fun NativeGameScreen(
                     }
                 }
 
-                // 5. Dedicated Interactive Bottom Action Bar (One-Handed Play Perfection)
-                val actionBg = if (isPlayerHolding) {
-                    if (activeDirection == 1) {
-                        Brush.horizontalGradient(listOf(theme.bull, theme.bull.copy(alpha = 0.85f)))
-                    } else {
-                        Brush.horizontalGradient(listOf(theme.bear, Color(0xFFFF5A1F)))
-                    }
-                } else {
-                    Brush.horizontalGradient(listOf(theme.bg.copy(alpha = 0.96f), theme.grid.copy(alpha = 0.25f)))
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(
-                        2.dp,
-                        if (isPlayerHolding) {
-                            if (activeDirection == 1) theme.bull else theme.bear
-                        } else theme.bull.copy(alpha = 0.45f)
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(58.dp)
-                        .shadow(12.dp, RoundedCornerShape(16.dp))
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    val startP = SetupEngine.priceAt(engine.candles, tapePosition)
-                                    isPlayerHolding = true
-                                    activeDirection = 1
-                                    tradeEntryPrice = startP
-                                    bridge.vibrate("hold_long")
-                                    val fb = SetupExecutionTimingEngine.evaluateEntry(
-                                        activeSetup = activeSetup,
-                                        tapePosition = tapePosition,
-                                        isLong = true
-                                    )
-                                    lastOutcome = "${fb.grade.badge} ${fb.grade.title}: ENTERED LONG [${activeSymbol.id}]"
-
-                                    tryAwaitRelease()
-
-                                    // On release: cash out!
-                                    val finalPnl = livePnl
-                                    isPlayerHolding = false
-                                    totalScore += finalPnl
-                                    if (finalPnl > 0) {
-                                        streak++
-                                        playerTakesCount++
-                                        bridge.vibrate("cash_out")
-                                        lastOutcome = "CASHED OUT: +$${String.format("%.2f", finalPnl)}"
-                                    } else {
-                                        streak = 0
-                                        playerStopsCount++
-                                        bridge.vibrate("liquidation")
-                                        lastOutcome = "LOSS: -$${String.format("%.2f", abs(finalPnl))}"
-                                    }
-                                }
-                            )
-                        }
-                ) {
-                    Box(
+                // 5. Tactical Non-Intrusive Guidance Pill (No touch interception, edge-to-edge chart)
+                if (!isPlayerHolding) {
+                    Surface(
+                        color = Color(0xFF0C1017).copy(alpha = 0.70f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF232D3B).copy(alpha = 0.85f)),
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(actionBg),
-                        contentAlignment = Alignment.Center
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 8.dp)
                     ) {
-                        if (isPlayerHolding) {
-                            val dirText = if (activeDirection == 1) "RIDING LONG" else "RIDING SHORT"
-                            val pnlSign = if (livePnl >= 0) "+$" else "-$"
-                            val pnlText = "$pnlSign${String.format("%.2f", abs(livePnl))}"
-                            val btnTextColor = if (theme.isLight) Color.White else Color.Black
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "$dirText ${currentLeverage.toInt()}×",
-                                    color = btnTextColor,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = "·",
-                                    color = btnTextColor.copy(alpha = 0.6f),
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = "RELEASE TO BANK $pnlText",
-                                    color = btnTextColor,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        } else {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "HOLD TO RIDE",
-                                        color = theme.text,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        letterSpacing = 1.sp
-                                    )
-                                    Text(
-                                        text = "⚡",
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                Text(
-                                    text = "LONG 🔺 · SHORT 🔻 · RELEASE TO CASH OUT",
-                                    color = theme.muted,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
+                        Text(
+                            text = "HOLD CANVAS TO RIDE LONG · SLIDE DOWN FOR SHORT · RELEASE TO CASH OUT",
+                            color = Color(0xFF8A99AD),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.5.dp)
+                        )
                     }
                 }
             }
