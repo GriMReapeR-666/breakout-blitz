@@ -26,8 +26,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.setuprush.candy.engine.*
 import com.setuprush.candy.theme.GameTheme
+import com.setuprush.candy.theme.ThemeCatalog
 import com.setuprush.candy.theme.ThemeManager
 import kotlin.math.abs
+
+// Top-Level Institutional Theme Palette
+private val deskCarbonBg = Color(0xFF090C12)
+private val deskPanelBg = Color(0xFF131924)
+private val deskGold = Color(0xFFFFC700)
+private val deskCyan = Color(0xFF00E5FF)
+private val deskRed = Color(0xFFFF334B)
+private val deskGreen = Color(0xFF00E676)
+private val deskMuted = Color(0xFF8A99AD)
+private val deskBorder = Color(0xFF263345)
 
 /**
  * Clash Royale Anatomy 5-Pillar Navigation Hub.
@@ -63,16 +74,6 @@ fun GameMenuHub(
     var activeFormat by remember { mutableStateOf(OpponentDuelEngine.MATCH_FORMATS[0]) }
     var activePresetSlotIndex by remember { mutableIntStateOf(TradingModelManager.activePresetSlotIndex) }
     var activeModel by remember { mutableStateOf(TradingModelManager.activeTradingModel) }
-
-    // Tactical Color Palette
-    val deskCarbonBg = Color(0xFF090C12)
-    val deskPanelBg = Color(0xFF131924)
-    val deskGold = Color(0xFFFFC700)
-    val deskCyan = Color(0xFF00E5FF)
-    val deskRed = Color(0xFFFF334B)
-    val deskGreen = Color(0xFF00E676)
-    val deskMuted = Color(0xFF8A99AD)
-    val deskBorder = Color(0xFF263345)
 
     Box(
         modifier = modifier
@@ -205,11 +206,6 @@ fun GameMenuHub(
             ) {
                 when (selectedPillar) {
                     MenuNavPillar.DESK -> DeskHomeContent(
-                        deskGold = deskGold,
-                        deskCyan = deskCyan,
-                        deskPanelBg = deskPanelBg,
-                        deskBorder = deskBorder,
-                        deskMuted = deskMuted,
                         activeSymbol = activeSymbol,
                         activeFormat = activeFormat,
                         activeModel = activeModel,
@@ -221,11 +217,6 @@ fun GameMenuHub(
                     )
                     MenuNavPillar.ARSENAL -> ArsenalPresetsContent(
                         theme = theme,
-                        deskGold = deskGold,
-                        deskCyan = deskCyan,
-                        deskPanelBg = deskPanelBg,
-                        deskBorder = deskBorder,
-                        deskMuted = deskMuted,
                         activePresetIndex = activePresetSlotIndex,
                         onSelectPresetIndex = { idx ->
                             activePresetSlotIndex = idx
@@ -239,11 +230,6 @@ fun GameMenuHub(
                         }
                     )
                     MenuNavPillar.ARENA -> ArenaMatchmakingContent(
-                        deskGold = deskGold,
-                        deskCyan = deskCyan,
-                        deskPanelBg = deskPanelBg,
-                        deskBorder = deskBorder,
-                        deskMuted = deskMuted,
                         activeSymbol = activeSymbol,
                         activeFormat = activeFormat,
                         onSelectFormat = { activeFormat = it },
@@ -258,14 +244,7 @@ fun GameMenuHub(
                             onLaunchMission(mission)
                         }
                     )
-                    MenuNavPillar.JOURNAL -> JournalCareerContent(
-                        theme = theme,
-                        deskGold = deskGold,
-                        deskCyan = deskCyan,
-                        deskPanelBg = deskPanelBg,
-                        deskBorder = deskBorder,
-                        deskMuted = deskMuted
-                    )
+                    MenuNavPillar.JOURNAL -> JournalCareerContent(theme = theme)
                     MenuNavPillar.VAULT -> StoreContent(theme = theme)
                 }
             }
@@ -332,11 +311,6 @@ fun GameMenuHub(
 
 @Composable
 fun DeskHomeContent(
-    deskGold: Color,
-    deskCyan: Color,
-    deskPanelBg: Color,
-    deskBorder: Color,
-    deskMuted: Color,
     activeSymbol: MarketSymbolCatalog.MarketSymbol,
     activeFormat: OpponentDuelEngine.MatchFormat,
     activeModel: TradingModelManager.CustomTradingModel,
@@ -656,11 +630,6 @@ fun DeskHomeContent(
 @Composable
 fun ArsenalPresetsContent(
     theme: GameTheme,
-    deskGold: Color,
-    deskCyan: Color,
-    deskPanelBg: Color,
-    deskBorder: Color,
-    deskMuted: Color,
     activePresetIndex: Int,
     onSelectPresetIndex: (Int) -> Unit,
     activeModel: TradingModelManager.CustomTradingModel,
@@ -1035,11 +1004,6 @@ fun ArsenalPresetsContent(
 
 @Composable
 fun ArenaMatchmakingContent(
-    deskGold: Color,
-    deskCyan: Color,
-    deskPanelBg: Color,
-    deskBorder: Color,
-    deskMuted: Color,
     activeSymbol: MarketSymbolCatalog.MarketSymbol,
     activeFormat: OpponentDuelEngine.MatchFormat,
     onSelectFormat: (OpponentDuelEngine.MatchFormat) -> Unit,
@@ -1122,8 +1086,6 @@ fun ArenaMatchmakingContent(
                                     Text(fmt.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black)
                                 }
                                 Text(fmt.subtitle, color = deskCyan, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(fmt.description, color = deskMuted, fontSize = 9.sp)
                             }
 
                             Button(
@@ -1161,12 +1123,7 @@ fun ArenaMatchmakingContent(
 
 @Composable
 fun JournalCareerContent(
-    theme: GameTheme,
-    deskGold: Color,
-    deskCyan: Color,
-    deskPanelBg: Color,
-    deskBorder: Color,
-    deskMuted: Color
+    theme: GameTheme
 ) {
     val allProgress = StrategyMasteryManager.getAllProgress()
     val totalTrades = allProgress.sumOf { it.winCount + it.lossCount }
@@ -1298,13 +1255,7 @@ fun JournalCareerContent(
 
         // Terminal Cockpit Settings
         item {
-            TacticalSettingsContent(
-                tacticalGold = deskGold,
-                tacticalCyan = deskCyan,
-                tacticalPanelBg = deskPanelBg,
-                tacticalBorder = deskBorder,
-                tacticalMuted = deskMuted
-            )
+            TacticalSettingsContent()
         }
     }
 }
@@ -1436,23 +1387,20 @@ fun TacticalCampaignContent(
 // ==================== TERMINAL COCKPIT SETTINGS ====================
 
 @Composable
-fun TacticalSettingsContent(
-    tacticalGold: Color,
-    tacticalCyan: Color,
-    tacticalPanelBg: Color,
-    tacticalBorder: Color,
-    tacticalMuted: Color
-) {
+fun TacticalSettingsContent() {
+    var isMuted by remember { mutableStateOf(SoundEffectManager.isMuted) }
+    var hapticsOn by remember { mutableStateOf(true) }
+
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = tacticalPanelBg,
-        border = BorderStroke(1.dp, tacticalBorder),
+        color = deskPanelBg,
+        border = BorderStroke(1.dp, deskBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 text = "TERMINAL COCKPIT & AUDIO CONFIGURATION",
-                color = tacticalGold,
+                color = deskGold,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
@@ -1465,11 +1413,14 @@ fun TacticalSettingsContent(
             ) {
                 Column {
                     Text("MASTER AUDIO & DESK SFX", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    Text("Realistic terminal tick, cash out, and stop-loss notifications", color = tacticalMuted, fontSize = 9.sp)
+                    Text("Realistic terminal tick, cash out, and stop-loss notifications", color = deskMuted, fontSize = 9.sp)
                 }
                 Switch(
-                    checked = SoundEffectManager.sfxEnabled,
-                    onCheckedChange = { SoundEffectManager.sfxEnabled = it }
+                    checked = !isMuted,
+                    onCheckedChange = {
+                        isMuted = !it
+                        SoundEffectManager.isMuted = !it
+                    }
                 )
             }
 
@@ -1480,11 +1431,11 @@ fun TacticalSettingsContent(
             ) {
                 Column {
                     Text("TACTILE HAPTIC FEEDBACK", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    Text("Intense tactile vibration upon entering and exiting trades", color = tacticalMuted, fontSize = 9.sp)
+                    Text("Intense tactile vibration upon entering and exiting trades", color = deskMuted, fontSize = 9.sp)
                 }
                 Switch(
-                    checked = SoundEffectManager.hapticsEnabled,
-                    onCheckedChange = { SoundEffectManager.hapticsEnabled = it }
+                    checked = hapticsOn,
+                    onCheckedChange = { hapticsOn = it }
                 )
             }
         }
@@ -1495,6 +1446,9 @@ fun TacticalSettingsContent(
 
 @Composable
 fun StoreContent(theme: GameTheme) {
+    val currentTheme = ThemeManager.currentTheme.value
+    val themes = remember { ThemeCatalog.all() }
+
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
@@ -1502,14 +1456,14 @@ fun StoreContent(theme: GameTheme) {
         item {
             Text(
                 text = "PROP VAULT & CAPITAL ALLOCATIONS",
-                color = Color(0xFFFFC700),
+                color = deskGold,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
             )
             Text(
                 text = "Combine evaluations, desk passes, and chart themes earned through performance",
-                color = Color(0xFF8A99AD),
+                color = deskMuted,
                 fontSize = 10.sp
             )
         }
@@ -1517,19 +1471,19 @@ fun StoreContent(theme: GameTheme) {
         item {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFFFFC700).copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, Color(0xFFFFC700)),
+                color = deskGold.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, deskGold),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("👑 COMBINE ALLOCATION PASS", color = Color(0xFFFFC700), fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    Text("5,000 Credits + Golden Candlestick Theme + Instant 50x Max Leverage", color = Color(0xFF8A99AD), fontSize = 9.sp)
+                    Text("👑 COMBINE ALLOCATION PASS", color = deskGold, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    Text("5,000 Credits + Golden Candlestick Theme + Instant 50x Max Leverage", color = deskMuted, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Button(
                         onClick = {
                             MonetizationManager.addCredits(5000)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC700))
+                        colors = ButtonDefaults.buttonColors(containerColor = deskGold)
                     ) {
                         Text("CLAIM CREDITS", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                     }
@@ -1541,18 +1495,19 @@ fun StoreContent(theme: GameTheme) {
             Text("CHART THEMES & VISUAL RETICLES", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             Spacer(modifier = Modifier.height(4.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(ThemeManager.availableThemes) { th ->
+                items(themes) { th ->
+                    val isSel = currentTheme.id == th.id
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF131924),
-                        border = BorderStroke(1.dp, if (ThemeManager.currentThemeId == th.id) Color(0xFFFFC700) else Color(0xFF263345)),
+                        color = deskPanelBg,
+                        border = BorderStroke(1.dp, if (isSel) deskGold else deskBorder),
                         modifier = Modifier
                             .width(130.dp)
                             .clickable { ThemeManager.setTheme(th.id) }
                     ) {
                         Column(modifier = Modifier.padding(8.dp)) {
                             Text(th.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            Text(if (ThemeManager.currentThemeId == th.id) "ACTIVE" else "SELECT", color = Color(0xFFFFC700), fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                            Text(if (isSel) "ACTIVE" else "SELECT", color = deskGold, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
