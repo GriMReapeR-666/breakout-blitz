@@ -698,7 +698,7 @@ fun NativeGameScreen(
                     tapePosition = 10.0
                     isPlayerHolding = false
                     elapsedSeconds = 0.0
-                    currentLeverage = if (formatId == "blowup") 2.0 else model.riskParams.leverageMultiplier
+                    currentLeverage = if (formatId == "blowup") 2.0 else model.leverage
                     SetupExecutionTimingEngine.resetStats()
                     if (isCompetitive) {
                         OpponentDuelEngine.startMatch(formatId, PlayerProfileManager.currentProfile.mmrRating)
