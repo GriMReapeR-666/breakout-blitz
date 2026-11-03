@@ -5,11 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -98,10 +98,11 @@ fun ChartCanvas(
         }
     }
 
-    // Continuously compute floating P&L
+    // Continuously compute floating P&L with authentic institutional notional
     LaunchedEffect(currentPrice, isHolding, activeDirection, entryPrice, currentLeverage) {
         if (isHolding) {
-            val notional = 1000.0 * (currentLeverage / 10.0)
+            val margin = 1000.0
+            val notional = margin * currentLeverage
             livePnl = SetupEngine.ridePnl(activeDirection, entryPrice, currentPrice, notional = notional)
         } else {
             livePnl = 0.0
@@ -461,6 +462,19 @@ fun ChartCanvas(
                 val sBotY = camera.yOf(setupLow, h) + 8f
                 val setupColor = if (activeSetup.dir == 1) theme.bull else theme.bear
 
+                // PATTERN LOCKED Reticle Header
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = "PATTERN LOCKED",
+                    topLeft = Offset(sMinX, sTopY - 14.dp.toPx()),
+                    style = TextStyle(
+                        color = setupColor,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
                 // Corner Reticles around setup candles
                 val bracketSize = 14f
                 val reticleStroke = 2.4f
@@ -680,6 +694,114 @@ fun ChartCanvas(
                     topLeft = Offset.Zero,
                     size = size
                 )
+            }
+        }
+
+        // 12. Tactical On-Screen Action Deck (Tactical Combat Controls for BUY / SELL / CASH OUT)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            if (!isHolding) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tactical BUY / LONG Button
+                    Button(
+                        onClick = {
+                            val startP = SetupEngine.priceAt(candles, tapePosition)
+                            isHolding = true
+                            activeDirection = 1
+                            entryPrice = startP
+                            entryTapeIndex = tapePosition
+                            onLongEntry()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.bull),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .shadow(8.dp, RoundedCornerShape(8.dp), spotColor = theme.bull)
+                    ) {
+                        Text(
+                            text = "BUY / LONG ▲",
+                            color = if (theme.isLight) Color.White else Color.Black,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    // Tactical SELL / SHORT Button
+                    Button(
+                        onClick = {
+                            val startP = SetupEngine.priceAt(candles, tapePosition)
+                            isHolding = true
+                            activeDirection = -1
+                            entryPrice = startP
+                            entryTapeIndex = tapePosition
+                            onShortEntry()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.bear),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .shadow(8.dp, RoundedCornerShape(8.dp), spotColor = theme.bear)
+                    ) {
+                        Text(
+                            text = "SELL / SHORT ▼",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+            } else {
+                // In position: Tactical CASH OUT button showing live P&L and ROI%
+                val pnlSign = if (livePnl >= 0) "+$" else "-$"
+                val roiPct = (livePnl / 1000.0) * 100.0
+                val cashoutColor = if (livePnl >= 0) theme.bull else theme.bear
+
+                Button(
+                    onClick = {
+                        val finalPnl = livePnl
+                        isHolding = false
+                        onCashOut(finalPnl)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = cashoutColor),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .shadow(12.dp, RoundedCornerShape(8.dp), spotColor = cashoutColor)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "💰 CASH OUT POSITION:",
+                            color = if (theme.isLight && livePnl >= 0) Color.White else Color.Black,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "$pnlSign${String.format("%.2f", abs(livePnl))} (${if (roiPct >= 0) "+" else ""}${String.format("%.1f", roiPct)}%)",
+                            color = if (theme.isLight && livePnl >= 0) Color.White else Color.Black,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
             }
         }
     }

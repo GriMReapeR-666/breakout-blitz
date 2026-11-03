@@ -94,6 +94,8 @@ fun NativeGameScreen(
     onSwitchToWebView: (() -> Unit)? = null
 ) {
     val theme by ThemeManager.currentTheme
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     var activeSymbol by remember { mutableStateOf(MarketSymbolCatalog.activeSymbol) }
     var engine by remember { mutableStateOf(SetupEngine(seed = System.currentTimeMillis(), symbol = activeSymbol)) }
     val camera = remember { SetupEngine.ChartCamera() }
@@ -144,10 +146,11 @@ fun NativeGameScreen(
         if (engine.candles.isEmpty()) 100.0 else SetupEngine.priceAt(engine.candles, tapePosition)
     }
 
-    // Active trade P&L calculation
+    // Active trade P&L calculation with authentic institutional notional
     LaunchedEffect(currentPrice, isPlayerHolding, activeDirection, tradeEntryPrice, currentLeverage) {
         if (isPlayerHolding) {
-            val notional = 1000.0 * (currentLeverage / 10.0)
+            val margin = 1000.0
+            val notional = margin * currentLeverage
             livePnl = SetupEngine.ridePnl(activeDirection, tradeEntryPrice, currentPrice, notional = notional)
         } else {
             livePnl = 0.0
@@ -210,9 +213,10 @@ fun NativeGameScreen(
 
                         // Liquidation / Stop-out check (if drawdown exceeds 80% of margin)
                         if (isPlayerHolding) {
-                            val notional = 1000.0 * (currentLeverage / 10.0)
+                            val margin = 1000.0
+                            val notional = margin * currentLeverage
                             val pnl = SetupEngine.ridePnl(activeDirection, tradeEntryPrice, curPrice, notional)
-                            if (pnl <= -notional * 0.8) {
+                            if (pnl <= -margin * 0.8) {
                                 isPlayerHolding = false
                                 totalScore += pnl
                                 streak = 0
@@ -222,6 +226,10 @@ fun NativeGameScreen(
                                 OpponentDuelEngine.recordPlayerStopLoss()
                                 activeStrategyKey?.let {
                                     StrategyMasteryManager.recordTrade(it, isWin = false)
+                                }
+                                val mission = StrategyMasteryManager.activeMission
+                                if (mission != null) {
+                                    lastOutcome = "MISSION ${mission.levelId} FAILED: STOPPED OUT · RETRY"
                                 }
                             }
                         }
@@ -416,28 +424,13 @@ fun NativeGameScreen(
             GameMenuHub(
                 theme = theme,
                 onLaunchGame = { formatId, sym, model ->
+                    StrategyMasteryManager.activeMission = null
                     pendingFormatId = formatId
                     activeSymbol = sym
                     TradingModelManager.activeTradingModel = model
+                    activeStrategyKey = model.setupKey
                     engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym)
-                    val s = StrategyCatalog.findSetup(model.setupKey)
-                    if (s != null) {
-                        val isBear = s.bias == "BEARISH"
-                        val base = sym.basePrice
-                        val riskAmt = base * 0.025
-                        engine.setups.add(
-                            SetupRecord(
-                                key = s.key,
-                                name = s.name,
-                                dir = if (isBear) -1 else 1,
-                                at = 15,
-                                entry = base,
-                                stop = if (isBear) base + riskAmt else base - riskAmt,
-                                risk = riskAmt,
-                                winRate = s.winRate
-                            )
-                        )
-                    }
+                    engine.appendSetup(model.setupKey, atBar = 16)
                     tapePosition = 10.0
                     isPlayerHolding = false
                     SetupExecutionTimingEngine.resetStats()
@@ -447,23 +440,10 @@ fun NativeGameScreen(
                     lastOutcome = "COMMENCED ${formatId.uppercase()}: ${sym.id}"
                 },
                 onOpenAcademyDrill = { setup, tier ->
+                    StrategyMasteryManager.activeMission = null
                     activeStrategyKey = setup.key
                     engine = SetupEngine(seed = System.currentTimeMillis(), symbol = activeSymbol)
-                    val isBear = setup.bias == "BEARISH"
-                    val base = activeSymbol.basePrice
-                    val riskAmt = base * 0.025
-                    engine.setups.add(
-                        SetupRecord(
-                            key = setup.key,
-                            name = setup.name,
-                            dir = if (isBear) -1 else 1,
-                            at = 15,
-                            entry = base,
-                            stop = if (isBear) base + riskAmt else base - riskAmt,
-                            risk = riskAmt,
-                            winRate = setup.winRate
-                        )
-                    )
+                    engine.appendSetup(setup.key, atBar = 16)
                     tapePosition = 10.0
                     isPlayerHolding = false
                     SetupExecutionTimingEngine.resetStats()
@@ -472,6 +452,20 @@ fun NativeGameScreen(
                     }
                     showMasterMenuHub = false
                     lastOutcome = "LAUNCHED TIER $tier TRIAL DRILL: ${setup.name.uppercase()}"
+                },
+                onLaunchMission = { mission ->
+                    StrategyMasteryManager.activeMission = mission
+                    activeStrategyKey = mission.targetSetupKey
+                    val sym = MarketSymbolCatalog.findSymbol(mission.symbolId) ?: activeSymbol
+                    activeSymbol = sym
+                    currentLeverage = mission.defaultLeverage
+                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym)
+                    engine.appendSetup(mission.targetSetupKey, atBar = 16)
+                    tapePosition = 10.0
+                    isPlayerHolding = false
+                    SetupExecutionTimingEngine.resetStats()
+                    showMasterMenuHub = false
+                    lastOutcome = "OPERATION LAUNCHED: ${mission.callsign} | CATCH ${mission.targetSetupKey.uppercase()}"
                 },
                 modifier = Modifier
                     .fillMaxSize()
@@ -537,6 +531,12 @@ fun NativeGameScreen(
                             activeStrategyKey?.let {
                                 StrategyMasteryManager.recordTrade(it, isWin = true, rMultiple = 2.0)
                             }
+                            val mission = StrategyMasteryManager.activeMission
+                            if (mission != null) {
+                                val stars = if (pnl >= 120.0) 3 else 2
+                                StrategyMasteryManager.completeMission(mission.levelId, stars, pnl)
+                                lastOutcome = "MISSION ${mission.levelId} CLEARED! +$${String.format("%.2f", pnl)} ($stars STARS ⭐)"
+                            }
                         } else {
                             streak = 0
                             playerStopsCount++
@@ -545,6 +545,10 @@ fun NativeGameScreen(
                             OpponentDuelEngine.recordPlayerStopLoss()
                             activeStrategyKey?.let {
                                 StrategyMasteryManager.recordTrade(it, isWin = false)
+                            }
+                            val mission = StrategyMasteryManager.activeMission
+                            if (mission != null) {
+                                lastOutcome = "MISSION ${mission.levelId} FAILED: -$${String.format("%.2f", abs(pnl))} · RETRY"
                             }
                         }
 
@@ -567,6 +571,52 @@ fun NativeGameScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // 1b. Tactical Solo Campaign Mission Objective HUD Banner
+                val currentMission = StrategyMasteryManager.activeMission
+                if (currentMission != null) {
+                    Surface(
+                        color = Color(0xFF131924).copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.2.dp, Color(0xFFFFC700)),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 4.dp, start = 14.dp, end = 14.dp)
+                            .shadow(6.dp, RoundedCornerShape(8.dp), spotColor = Color(0xFFFFC700))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🎯", fontSize = 13.sp)
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "OP ${currentMission.levelId}: ${currentMission.callsign}",
+                                        color = Color(0xFFFFC700),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "· ${currentMission.targetBias} [${currentMission.targetSetupKey.uppercase()}]",
+                                        color = Color(0xFF00E5FF),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Text(
+                                    text = "${currentMission.briefing} · CATCH MOVE TO REACH +2R TAKE PROFIT",
+                                    color = Color(0xFF8A99AD),
+                                    fontSize = 8.5.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // 2. Mid-Upper Pattern Locked Banner (Setup Rush signature banner)
                 AnimatedVisibility(
@@ -799,7 +849,7 @@ fun NativeGameScreen(
                                     )
                                 }
                                 Text(
-                                    text = "▲ HOLD LONG · ▼ SLIDE SHORT · RELEASE TO CASH OUT",
+                                    text = "LONG 🔺 · SHORT 🔻 · RELEASE TO CASH OUT",
                                     color = theme.muted,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,

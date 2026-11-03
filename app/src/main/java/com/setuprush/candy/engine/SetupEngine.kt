@@ -24,7 +24,8 @@ class SetupEngine(
             regime()
             for (i in 0 until 6) {
                 if (rng() < 0.5) regime()
-                leg(10, home + (rng() - 0.5) * (home * 0.04), 1.0)
+                val swingTarget = price + home * (0.012 + rng() * 0.028) * (if (rng() > 0.5) 1.0 else -1.0)
+                leg(10, swingTarget, 1.0)
             }
         }
         candles.addAll(b.candles)
@@ -37,9 +38,9 @@ class SetupEngine(
         }
     }
 
-    fun lastPrice(): Double = candles.last().c
+    fun lastPrice(): Double = if (candles.isEmpty()) home else candles.last().c
 
-    /** Generates a valid trading setup record from the master StrategyCatalog */
+    /** Generates a valid trading setup record and sculpts authentic candlestick anatomy */
     fun appendSetup(preferredKey: String? = null, atBar: Int = max(0, candles.size - 1)) {
         val chosen = (preferredKey?.let { StrategyCatalog.findStrategy(it) }
             ?: StrategyCatalog.ALL_SETUPS[(rng() * StrategyCatalog.ALL_SETUPS.size).toInt().coerceIn(0, StrategyCatalog.ALL_SETUPS.size - 1)])
@@ -50,7 +51,7 @@ class SetupEngine(
             else -> if (rng() > 0.5) 1 else -1
         }
         val curPrice = lastPrice()
-        val risk = max(curPrice * 0.012 * symbol.volatility, 0.5)
+        val risk = max(curPrice * 0.016 * symbol.volatility, curPrice * 0.008)
         val stop = if (dir == 1) curPrice - risk else curPrice + risk
         
         val rec = SetupRecord(
@@ -64,6 +65,102 @@ class SetupEngine(
             winRate = chosen.winRate
         )
         setups.add(rec)
+        embedSetupAnatomy(rec, atBar)
+    }
+
+    /**
+     * Procedurally sculpts the authentic candlestick geometry on the tape for the specified setup
+     * and generates realistic follow-through bars towards the +2R target!
+     */
+    fun embedSetupAnatomy(setup: SetupRecord, at: Int) {
+        if (at < 3 || at >= candles.size) return
+        val p = candles[at].c
+        val dir = setup.dir
+        val range = setup.risk * 0.45
+
+        when {
+            setup.key.contains("hammer", ignoreCase = true) || setup.key.contains("pinbar", ignoreCase = true) -> {
+                // Pin Bar / Hammer: Small body at extreme, long lower wick (2.5x body) in direction opposite to trade
+                val o = p
+                val c = if (dir == 1) o + range * 0.35 else o - range * 0.35
+                val h = if (dir == 1) c + range * 0.1 else o + range * 2.6
+                val l = if (dir == 1) o - range * 2.6 else c - range * 0.1
+                candles[at] = Candle(o, h, l, c, candles[at].v * 1.8)
+            }
+            setup.key.contains("engulfing", ignoreCase = true) -> {
+                // Previous bar is small counter-trend
+                val prevO = p - dir * range * 0.5
+                val prevC = p
+                val prevH = max(prevO, prevC) + range * 0.1
+                val prevL = min(prevO, prevC) - range * 0.1
+                candles[at - 1] = Candle(prevO, prevH, prevL, prevC, candles[at - 1].v)
+
+                // Current bar completely engulfs previous bar in direction of trade
+                val o = p
+                val c = if (dir == 1) o + range * 1.8 else o - range * 1.8
+                val h = max(o, c) + range * 0.2
+                val l = min(o, c) - range * 0.2
+                candles[at] = Candle(o, h, l, c, candles[at].v * 2.5)
+            }
+            setup.key.contains("fvg", ignoreCase = true) -> {
+                // Fair Value Gap: 3-bar displacement leaving a clear imbalance gap
+                val bar1 = candles[at - 2]
+                val dispO = bar1.c
+                val dispC = if (dir == 1) dispO + range * 2.4 else dispO - range * 2.4
+                candles[at - 1] = Candle(dispO, max(dispO, dispC) + range * 0.2, min(dispO, dispC) - range * 0.2, dispC, candles[at - 1].v * 3.2)
+                val o3 = dispC
+                val c3 = if (dir == 1) o3 + range * 0.8 else o3 - range * 0.8
+                val l3 = if (dir == 1) min(o3, c3) - range * 0.2 else min(o3, c3)
+                val h3 = if (dir == 1) max(o3, c3) else max(o3, c3) + range * 0.2
+                candles[at] = Candle(o3, h3, l3, c3, candles[at].v * 1.6)
+            }
+            setup.key.contains("flag", ignoreCase = true) -> {
+                val o = p
+                val c = if (dir == 1) o + range * 1.6 else o - range * 1.6
+                candles[at] = Candle(o, max(o, c) + range * 0.3, min(o, c) - range * 0.1, c, candles[at].v * 2.2)
+            }
+            setup.key.contains("double", ignoreCase = true) || setup.key.contains("dbottom", ignoreCase = true) -> {
+                // Double bottom / double top retest
+                val retestLow = if (dir == 1) p - range * 1.5 else p + range * 1.5
+                candles[at - 2] = Candle(p, p + range * 0.2, retestLow, p - dir * range * 0.2, candles[at - 2].v * 1.4)
+                val o = candles[at - 2].c
+                val c = if (dir == 1) o + range * 1.5 else o - range * 1.5
+                candles[at] = Candle(o, max(o, c) + range * 0.3, min(o, c) - range * 0.1, c, candles[at].v * 2.1)
+            }
+            setup.key.contains("sweep", ignoreCase = true) || setup.key.contains("liquidity", ignoreCase = true) -> {
+                // Liquidity sweep: deep false breakout wick that immediately reverses
+                val o = p
+                val wickExtreme = if (dir == 1) o - range * 2.8 else o + range * 2.8
+                val c = if (dir == 1) o + range * 0.9 else o - range * 0.9
+                candles[at] = Candle(o, if (dir == 1) c + range * 0.2 else wickExtreme, if (dir == 1) wickExtreme else c - range * 0.2, c, candles[at].v * 3.0)
+            }
+            setup.key.contains("order_block", ignoreCase = true) || setup.key.contains("ob", ignoreCase = true) -> {
+                // Order block retest and displacement
+                val o = p
+                val c = if (dir == 1) o + range * 2.0 else o - range * 2.0
+                candles[at] = Candle(o, max(o, c) + range * 0.2, min(o, c) - range * 0.2, c, candles[at].v * 2.6)
+            }
+            else -> {
+                // Universal directional momentum displacement
+                val o = p
+                val c = if (dir == 1) o + range * 1.7 else o - range * 1.7
+                candles[at] = Candle(o, max(o, c) + range * 0.3, min(o, c) - range * 0.3, c, candles[at].v * 2.0)
+            }
+        }
+
+        // Procedurally generate realistic follow-through bars advancing towards target
+        val isWin = rng() < setup.winRate
+        val targetMove = if (isWin) dir * setup.risk * 2.1 else -dir * setup.risk * 1.1
+        var walkPrice = candles[at].c
+        for (step in 1..8) {
+            val stepDrift = (targetMove / 8.0) * (0.7 + rng() * 0.6)
+            val oBar = walkPrice
+            val cBar = oBar + stepDrift
+            val hBar = max(oBar, cBar) + range * (0.1 + rng() * 0.15)
+            val lBar = min(oBar, cBar) - range * (0.1 + rng() * 0.15)
+            candles.add(Candle(oBar, hBar, lBar, cBar, candles[at].v * (0.7 + rng() * 0.5)))
+            walkPrice = cBar
+        }
     }
 
     /** Generates additional drift & chop candles before the next setup */
@@ -75,7 +172,10 @@ class SetupEngine(
             val pull = (home - b.price) * 0.25
             if (rng() < 0.35) b.regime()
             if (rng() < 0.30) b.chop(len, b.price, 0.8)
-            else b.leg(len, b.price + pull + (rng() - 0.5) * (home * 0.032), 1.0)
+            else {
+                val swingTarget = b.price + pull + (rng() - 0.5) * (home * 0.035)
+                b.leg(len, swingTarget, 1.0)
+            }
             left -= len
         }
         return b.candles
@@ -85,7 +185,7 @@ class SetupEngine(
     fun ensure(k: Int, n: Int, preferredKey: String? = null) {
         var guard = 0
         while (candles.size - 1 < k + n && guard++ < 10) {
-            val f = filler(12)
+            val f = filler(14)
             candles.addAll(f)
             // Periodically trigger a new setup if tape has advanced
             val lastSetupAt = setups.lastOrNull()?.at ?: 0
@@ -220,6 +320,49 @@ class SetupEngine(
             val gross = (dir * (currentPrice - entry)) / entry * notional
             val fee = (2.0 * feeBps / 10000.0) * notional
             return gross - fee
+        }
+
+        /**
+         * Comprehensive institutional trading P&L calculator with leverage, fees, and ROI%
+         */
+        fun calculatePnl(
+            dir: Int,
+            entry: Double,
+            currentPrice: Double,
+            margin: Double = 1000.0,
+            leverage: Double = 10.0,
+            targetPrice: Double? = null,
+            stopPrice: Double? = null,
+            feeBps: Double = 4.0
+        ): TradePnlResult {
+            val notional = margin * leverage
+            val priceReturn = if (entry > 0.0) (currentPrice - entry) / entry else 0.0
+            val gross = dir * priceReturn * notional
+            val fee = (2.0 * feeBps / 10000.0) * notional
+            val net = gross - fee
+            val roi = if (margin > 0.0) (net / margin) * 100.0 else 0.0
+
+            val targetHit = when {
+                targetPrice == null -> false
+                dir == 1 -> currentPrice >= targetPrice
+                else -> currentPrice <= targetPrice
+            }
+
+            val stoppedOut = when {
+                stopPrice == null -> net <= -margin * 0.85
+                dir == 1 -> currentPrice <= stopPrice
+                else -> currentPrice >= stopPrice
+            }
+
+            return TradePnlResult(
+                grossPnl = gross,
+                netPnl = net,
+                fee = fee,
+                roiPct = roi,
+                notional = notional,
+                isTargetHit = targetHit,
+                isStoppedOut = stoppedOut
+            )
         }
 
         /** Solves first tape position where liquidation occurs */
@@ -379,13 +522,16 @@ class SetupEngine(
         }
 
         fun bar(drift: Double, volMul: Double = 1.0) {
-            val v = vol * volMul
-            val open = price + normal(rng) * v * 0.08
-            val close = open + drift + normal(rng) * v
+            // Price-proportional volatility scaling:
+            // Realistic percentage swings across BTC ($65k), ETH ($2.6k), SOL ($180), GOLD ($2.7k)
+            val barVol = price * (vol * 0.007 * volMul)
+            val open = price + normal(rng) * (barVol * 0.08)
+            val close = open + drift + normal(rng) * barVol
             val body = abs(close - open)
-            val up = 0.04 + rng() * wick + body * (0.05 + rng() * 0.2)
-            val dn = 0.04 + rng() * wick + body * (0.05 + rng() * 0.2)
-            val shock = 1.0 + min(1.8, body / max(0.12, v * 2.4))
+            val wickSpread = price * (0.0012 + rng() * wick * 0.003)
+            val up = wickSpread + body * (0.05 + rng() * 0.2)
+            val dn = wickSpread + body * (0.05 + rng() * 0.2)
+            val shock = 1.0 + min(1.8, body / max(price * 0.002, barVol * 2.4))
             push(open, max(open, close) + up, min(open, close) - dn, close, vb * (0.65 + rng() * 0.9) * shock)
         }
 
@@ -423,4 +569,14 @@ data class SetupRecord(
     val stop: Double,
     val risk: Double,
     val winRate: Double
+)
+
+data class TradePnlResult(
+    val grossPnl: Double,
+    val netPnl: Double,
+    val fee: Double,
+    val roiPct: Double,
+    val notional: Double,
+    val isTargetHit: Boolean,
+    val isStoppedOut: Boolean
 )

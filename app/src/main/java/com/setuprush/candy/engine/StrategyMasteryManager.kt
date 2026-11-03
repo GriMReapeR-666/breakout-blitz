@@ -1,13 +1,13 @@
 package com.setuprush.candy.engine
 
 /**
- * Strategy Mastery Progression Engine.
- * Implements an institutional 5-tier mastery tree for each of the 24+ setups:
- * - Tier 1: Recruit (Visual Anatomy)
- * - Tier 2: Marksman (Precision Entry)
- * - Tier 3: Veteran (Trap & Volume Filter)
- * - Tier 4: Specialist (Turbo Speed & Drawdown Control)
- * - Tier 5: Grandmaster (Blind Chart Boss Trial -> Unlocks for Multiplayer)
+ * Strategy Mastery Progression Engine & Solo Campaign Command.
+ * Implements:
+ * 1. 7 Strategy Families with 5-Tier Interactive Skill Trees and unlockable perk nodes.
+ * 2. 35-Level Solo Player Campaign Missions (5 per strategy family) where the selected setup
+ *    ACTUALLY OCCURS on the chart and must be caught by the player to achieve victory.
+ * 3. Skill Points (SP) economy and star progression (1 to 3 stars per mission).
+ * 4. Backward compatible with all existing StrategyMasteryManager APIs.
  */
 object StrategyMasteryManager {
 
@@ -25,13 +25,50 @@ object StrategyMasteryManager {
             get() = if (winCount + lossCount == 0) 0.0 else winCount.toDouble() / (winCount + lossCount)
     }
 
+    data class SkillTreeNode(
+        val id: String,
+        val family: StrategyCatalog.StrategyFamily,
+        val tier: Int, // 1 to 5
+        val name: String,
+        val icon: String,
+        val perkTitle: String,
+        val perkDesc: String,
+        val spCost: Int,
+        var isUnlocked: Boolean = false
+    )
+
+    data class SoloCampaignMission(
+        val levelId: Int, // 1 to 35
+        val family: StrategyCatalog.StrategyFamily,
+        val tierInFamily: Int, // 1 to 5
+        val title: String,
+        val callsign: String,
+        val briefing: String,
+        val targetSetupKey: String,
+        val targetBias: String, // "BULLISH" or "BEARISH"
+        val symbolId: String,
+        val targetR: Double = 2.0,
+        val maxDrawdownR: Double = 1.0,
+        val tapeSpeed: Double = 1.0,
+        val defaultLeverage: Double = 10.0,
+        var starsEarned: Int = 0, // 0 to 3
+        var isUnlocked: Boolean = false,
+        val xpReward: Int = 250,
+        val creditsReward: Int = 150
+    )
+
+    var availableSkillPoints: Int = 6
+
     private val progressMap = mutableMapOf<String, StrategyProgress>()
+    private val skillNodes = mutableListOf<SkillTreeNode>()
+    private val campaignMissions = mutableListOf<SoloCampaignMission>()
+
+    var activeMission: SoloCampaignMission? = null
 
     init {
-        // Initialize all strategies from StrategyCatalog
+        // Initialize legacy setups
         StrategyCatalog.ALL_SETUPS.forEach { setup ->
-            // Pre-certify 3 starter setups so multiplayer is immediately playable
-            val isStarter = setup.key in listOf("engulfing", "smc_fvg", "flag")
+            val isStarter = setup.key in listOf("engulfing", "smc_fvg", "flag", "pa_break_retest")
             progressMap[setup.key] = StrategyProgress(
                 key = setup.key,
                 tier = if (isStarter) 5 else 1,
@@ -39,7 +76,191 @@ object StrategyMasteryManager {
                 isCertifiedForMultiplayer = isStarter
             )
         }
+
+        // Initialize 5-Tier Skill Trees for all 7 Strategy Families
+        StrategyCatalog.StrategyFamily.values().forEach { fam ->
+            skillNodes.add(
+                SkillTreeNode(
+                    id = "${fam.name.lowercase()}_tier1",
+                    family = fam,
+                    tier = 1,
+                    name = "Visual Anatomy",
+                    icon = "👁️",
+                    perkTitle = "Pattern Reticle",
+                    perkDesc = "Highlights setup formation candle on tape with tactical reticle.",
+                    spCost = 1,
+                    isUnlocked = true // Tier 1 unlocked by default
+                )
+            )
+            skillNodes.add(
+                SkillTreeNode(
+                    id = "${fam.name.lowercase()}_tier2",
+                    family = fam,
+                    tier = 2,
+                    name = "Precision Timing",
+                    icon = "🎯",
+                    perkTitle = "Sniper Entry",
+                    perkDesc = "+20% score bonus when executing within 2 candles of setup trigger.",
+                    spCost = 2,
+                    isUnlocked = false
+                )
+            )
+            skillNodes.add(
+                SkillTreeNode(
+                    id = "${fam.name.lowercase()}_tier3",
+                    family = fam,
+                    tier = 3,
+                    name = "Risk Armor",
+                    icon = "🛡️",
+                    perkTitle = "Trailing Guard",
+                    perkDesc = "Locks trailing stop to breakeven when position reaches +1R.",
+                    spCost = 3,
+                    isUnlocked = false
+                )
+            )
+            skillNodes.add(
+                SkillTreeNode(
+                    id = "${fam.name.lowercase()}_tier4",
+                    family = fam,
+                    tier = 4,
+                    name = "Order Flow Shield",
+                    icon = "⚡",
+                    perkTitle = "Fakeout Filter",
+                    perkDesc = "Institutional volume filter dampens false breakout whipsaws.",
+                    spCost = 4,
+                    isUnlocked = false
+                )
+            )
+            skillNodes.add(
+                SkillTreeNode(
+                    id = "${fam.name.lowercase()}_tier5",
+                    family = fam,
+                    tier = 5,
+                    name = "Grandmaster Apex",
+                    icon = "👑",
+                    perkTitle = "50x Lev Overdrive",
+                    perkDesc = "Unlocks 50x max leverage and certifies setup for ranked PvP duels.",
+                    spCost = 5,
+                    isUnlocked = false
+                )
+            )
+        }
+
+        // Initialize 35 Solo Player Campaign Missions (5 per Strategy Family)
+        val missionsDef = listOf(
+            // Family 1: PRICE ACTION (1..5)
+            SoloCampaignMission(1, StrategyCatalog.StrategyFamily.PRICE_ACTION, 1, "OPERATION BREAKOUT", "RETEST_ALPHA", "Identify the horizontal resistance breakout and buy the pullback retest floor.", "pa_break_retest", "BULLISH", "BTC", tapeSpeed = 0.85, isUnlocked = true),
+            SoloCampaignMission(2, StrategyCatalog.StrategyFamily.PRICE_ACTION, 2, "TRENDLINE CRACK", "DIAGONAL_VIPER", "Catch the breakdown below ascending diagonal support and short the flip.", "pa_trendline_break", "BEARISH", "ETH", tapeSpeed = 0.90),
+            SoloCampaignMission(3, StrategyCatalog.StrategyFamily.PRICE_ACTION, 3, "DOUBLE BOTTOM BASE", "TWIN_SHIELD", "Confirm the second trough rejection wick and enter long on the neckline break.", "dbottom", "BULLISH", "SOL", tapeSpeed = 0.95),
+            SoloCampaignMission(4, StrategyCatalog.StrategyFamily.PRICE_ACTION, 4, "BULL FLAG CATAPULT", "FLAG_PENNANT", "Ride the upward breakout of a descending channel consolidation in an active bull trend.", "flag", "BULLISH", "GOLD", tapeSpeed = 1.05),
+            SoloCampaignMission(5, StrategyCatalog.StrategyFamily.PRICE_ACTION, 5, "HEAD & SHOULDERS APEX", "APEX_REVERSAL", "Master trial: Spot the right shoulder exhaustion and short the neckline breakdown.", "pa_head_shoulders", "BEARISH", "BTC", tapeSpeed = 1.15),
+
+            // Family 2: CANDLESTICK PATTERNS (6..10)
+            SoloCampaignMission(6, StrategyCatalog.StrategyFamily.CANDLESTICK, 1, "HAMMER REBOUND", "IRON_HAMMER", "Spot the elongated lower shadow (2.5x body) at support and hold long.", "candle_hammer", "BULLISH", "BTC", tapeSpeed = 0.85, isUnlocked = true),
+            SoloCampaignMission(7, StrategyCatalog.StrategyFamily.CANDLESTICK, 2, "SHOOTING STAR ROOF", "FALLING_STAR", "Enter short upon seeing high upper wick rejection at resistance ceiling.", "candle_shooting_star", "BEARISH", "ETH", tapeSpeed = 0.90),
+            SoloCampaignMission(8, StrategyCatalog.StrategyFamily.CANDLESTICK, 3, "ENGULFING DOMINANCE", "BODY_SWALLOW", "Catch the high-volume green candle completely engulfing the preceding red candle.", "engulfing", "BULLISH", "SOL", tapeSpeed = 0.95),
+            SoloCampaignMission(9, StrategyCatalog.StrategyFamily.CANDLESTICK, 4, "MORNING STAR DAWN", "TRIPLE_DAWN", "Identify the 3-candle bottom reversal: impulse down, star doji, impulse up.", "candle_morning_star", "BULLISH", "GOLD", tapeSpeed = 1.05),
+            SoloCampaignMission(10, StrategyCatalog.StrategyFamily.CANDLESTICK, 5, "RAILROAD TRACKS", "TWIN_RAILS", "Master trial: Spot dual opposing bars of equal range signaling immediate institutional rejection.", "candle_railroad", "BEARISH", "DOGE", tapeSpeed = 1.20),
+
+            // Family 3: SMART MONEY CONCEPTS (11..15)
+            SoloCampaignMission(11, StrategyCatalog.StrategyFamily.SMC, 1, "FAIR VALUE GAP", "IMBALANCE_SWARM", "Enter long as price dips into the 3-candle fair value imbalance gap.", "smc_fvg", "BULLISH", "BTC", tapeSpeed = 0.90, isUnlocked = true),
+            SoloCampaignMission(12, StrategyCatalog.StrategyFamily.SMC, 2, "ORDER BLOCK BASTION", "INSTITUTIONAL_FOOTPRINT", "Catch the mitigative retest of the last bearish candle before impulse rally.", "smc_order_block", "BULLISH", "ETH", tapeSpeed = 0.95),
+            SoloCampaignMission(13, StrategyCatalog.StrategyFamily.SMC, 3, "LIQUIDITY SWEEP", "STOP_HUNTER", "Identify stop raid above equal highs followed by immediate displacement lower.", "smc_liquidity_sweep", "BEARISH", "SOL", tapeSpeed = 1.05),
+            SoloCampaignMission(14, StrategyCatalog.StrategyFamily.SMC, 4, "STRUCTURE SHIFT", "CHoCH_DISPLACEMENT", "Trade the decisive Change of Character (CHoCH) swing high break with displacement.", "smc_structure_shift", "BULLISH", "GOLD", tapeSpeed = 1.10),
+            SoloCampaignMission(15, StrategyCatalog.StrategyFamily.SMC, 5, "BREAKER BLOCK FLIP", "BREAKER_CRUSH", "Master trial: Prior invalid order block flipped into aggressive institutional resistance.", "smc_breaker", "BEARISH", "SUI", tapeSpeed = 1.25),
+
+            // Family 4: CANDLE RANGE THEORY (16..20)
+            SoloCampaignMission(16, StrategyCatalog.StrategyFamily.CRT, 1, "AMD POWER OF THREE", "JUDAS_SWEEP", "Identify London session judas sweep manipulation before NY session expansion.", "crt_amd", "BULLISH", "BTC", tapeSpeed = 0.90, isUnlocked = true),
+            SoloCampaignMission(17, StrategyCatalog.StrategyFamily.CRT, 2, "OPENING RANGE RUSH", "ORB_ACCELERATOR", "Enter aggressive long on break of 15-minute Opening Range high.", "crt_orb", "BULLISH", "ETH", tapeSpeed = 1.00),
+            SoloCampaignMission(18, StrategyCatalog.StrategyFamily.CRT, 3, "PREVIOUS DAY HIGH SWEEP", "TURTLE_SOUP", "Short the failed breakout above yesterday's high returning into value.", "crt_pdh_sweep", "BEARISH", "SOL", tapeSpeed = 1.05),
+            SoloCampaignMission(19, StrategyCatalog.StrategyFamily.CRT, 4, "SESSION EXPANSION", "KILLZONE_SURGE", "Ride high-beta volatility surge during London/NY session overlap.", "crt_session_expansion", "BULLISH", "GOLD", tapeSpeed = 1.15),
+            SoloCampaignMission(20, StrategyCatalog.StrategyFamily.CRT, 5, "HTF WICK RETRACE", "BODY_FILL", "Master trial: Higher timeframe rejection wick fill on 1m intraday tape.", "crt_wick_fill", "BEARISH", "DOGE", tapeSpeed = 1.25),
+
+            // Family 5: TREND FOLLOWING (21..25)
+            SoloCampaignMission(21, StrategyCatalog.StrategyFamily.TREND_FOLLOWING, 1, "SUPERTREND SURF", "GREEN_RIBBON", "Enter on green Supertrend flip and ride high-momentum trending tape.", "trend_supertrend", "BULLISH", "BTC", tapeSpeed = 0.90, isUnlocked = true),
+            SoloCampaignMission(22, StrategyCatalog.StrategyFamily.TREND_FOLLOWING, 2, "EMA GOLDEN CROSS", "DUAL_VECTOR", "Ride the 20 EMA crossing above the 50 EMA with expanding bands.", "trend_ema_cross", "BULLISH", "ETH", tapeSpeed = 0.95),
+            SoloCampaignMission(23, StrategyCatalog.StrategyFamily.TREND_FOLLOWING, 3, "MOVING AVERAGE PULLBACK", "DYNAMIC_SPRING", "Exercise patience: Wait for the orderly retest of the rising 20 EMA to enter long.", "trend_ma_pullback", "BULLISH", "SOL", tapeSpeed = 1.05),
+            SoloCampaignMission(24, StrategyCatalog.StrategyFamily.TREND_FOLLOWING, 4, "DONCHIAN CHANNEL SPRINT", "TURTLE_LEGEND", "Ride the 20-candle highest high channel breakout without second-guessing.", "trend_donchian", "BULLISH", "GOLD", tapeSpeed = 1.15),
+            SoloCampaignMission(25, StrategyCatalog.StrategyFamily.TREND_FOLLOWING, 5, "PARABOLIC SAR ACCEL", "RADAR_DOTS", "Master trial: Spot trend exhaustion and enter short upon SAR dot flip above price.", "trend_psar", "BEARISH", "SUI", tapeSpeed = 1.25),
+
+            // Family 6: MEAN REVERSION & OSCILLATORS (26..30)
+            SoloCampaignMission(26, StrategyCatalog.StrategyFamily.MEAN_REVERSION, 1, "RSI DIVERGENCE", "MOMENTUM_MISMATCH", "Price prints lower low while RSI prints higher low at oversold territory.", "revert_rsi_div", "BULLISH", "BTC", tapeSpeed = 0.90, isUnlocked = true),
+            SoloCampaignMission(27, StrategyCatalog.StrategyFamily.MEAN_REVERSION, 2, "BOLLINGER BAND PINCH", "VOLATILITY_SQUEEZE", "Catch the explosive directional breakout following extreme band compression.", "revert_bb_pinch", "BULLISH", "ETH", tapeSpeed = 1.00),
+            SoloCampaignMission(28, StrategyCatalog.StrategyFamily.MEAN_REVERSION, 3, "KELTNER EXTREME FADE", "RUBBER_BAND", "Fade the +3 ATR extension outside upper Keltner channel back toward baseline.", "revert_keltner", "BEARISH", "SOL", tapeSpeed = 1.05),
+            SoloCampaignMission(29, StrategyCatalog.StrategyFamily.MEAN_REVERSION, 4, "STOCHASTIC POP", "OSCILLATOR_ROCKET", "Enter long upon sub-15 oversold bullish stochastic %K / %D crossover.", "revert_stoch_pop", "BULLISH", "GOLD", tapeSpeed = 1.15),
+            SoloCampaignMission(30, StrategyCatalog.StrategyFamily.MEAN_REVERSION, 5, "VWAP MEAN SNAP", "CENTRAL_MAGNET", "Master trial: Exploit violent extension from Institutional VWAP and ride mean reversion.", "revert_vwap_snap", "BEARISH", "DOGE", tapeSpeed = 1.30),
+
+            // Family 7: COMMUNITY TOP INDICATORS (31..35)
+            SoloCampaignMission(31, StrategyCatalog.StrategyFamily.INDICATOR_TOP, 1, "SQUEEZE MOMENTUM", "CARTER_FIRE", "Enter long as black squeeze dots release into explosive light green histogram.", "comm_squeeze", "BULLISH", "BTC", tapeSpeed = 0.95, isUnlocked = true),
+            SoloCampaignMission(32, StrategyCatalog.StrategyFamily.INDICATOR_TOP, 2, "WAVETREND GOLDEN DOT", "LAZYBEAR_CROSS", "Buy the oversold green WaveTrend line crossing up through red line with gold circle.", "comm_wavetrend", "BULLISH", "ETH", tapeSpeed = 1.00),
+            SoloCampaignMission(33, StrategyCatalog.StrategyFamily.INDICATOR_TOP, 3, "UT BOT SHORT ALERT", "QUANT_SIGNAL", "Short the chart instantly when UT Bot prints red sell arrow with trailing stop.", "comm_utbot", "BEARISH", "SOL", tapeSpeed = 1.10),
+            SoloCampaignMission(34, StrategyCatalog.StrategyFamily.INDICATOR_TOP, 4, "NADARAYA-WATSON BOUNCE", "KERNEL_BOUND", "Buy the non-parametric regression lower envelope contact bounce.", "comm_nadaraya", "BULLISH", "GOLD", tapeSpeed = 1.15),
+            SoloCampaignMission(35, StrategyCatalog.StrategyFamily.INDICATOR_TOP, 5, "WADDAH ATTAR EXPLOSION", "DEADZONE_BREAKER", "Master trial: Buy when green MACD volume pillar punches through explosion line.", "comm_waddah", "BULLISH", "SUI", tapeSpeed = 1.35)
+        )
+        campaignMissions.addAll(missionsDef)
     }
+
+    // ==================== CAMPAIGN & SKILL TREE APIS ====================
+
+    fun getAllCampaignMissions(): List<SoloCampaignMission> = campaignMissions
+
+    fun getMissionsForFamily(family: StrategyCatalog.StrategyFamily): List<SoloCampaignMission> {
+        return campaignMissions.filter { it.family == family }
+    }
+
+    fun getMissionById(id: Int): SoloCampaignMission? {
+        return campaignMissions.find { it.levelId == id }
+    }
+
+    fun getSkillTreeForFamily(family: StrategyCatalog.StrategyFamily): List<SkillTreeNode> {
+        return skillNodes.filter { it.family == family }
+    }
+
+    fun isPerkUnlocked(nodeId: String): Boolean {
+        return skillNodes.find { it.id == nodeId }?.isUnlocked ?: false
+    }
+
+    fun unlockPerk(nodeId: String): Boolean {
+        val node = skillNodes.find { it.id == nodeId } ?: return false
+        if (node.isUnlocked) return true
+        if (availableSkillPoints >= node.spCost) {
+            availableSkillPoints -= node.spCost
+            node.isUnlocked = true
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Marks a campaign mission as completed, calculates star rating (1 to 3),
+     * awards XP, Credits, Skill Points, and unlocks the subsequent mission level.
+     */
+    fun completeMission(levelId: Int, stars: Int, pnl: Double): Boolean {
+        val mission = campaignMissions.find { it.levelId == levelId } ?: return false
+        val awardedStars = stars.coerceIn(1, 3)
+        if (awardedStars > mission.starsEarned) {
+            val deltaStars = awardedStars - mission.starsEarned
+            mission.starsEarned = awardedStars
+            availableSkillPoints += deltaStars
+            MonetizationManager.addCredits(mission.creditsReward * deltaStars)
+            PlayerProfileManager.recordMatch(
+                isWin = true,
+                pnl = pnl,
+                rMultiple = 2.0,
+                format = "campaign_mission_${mission.levelId}",
+                symbol = mission.symbolId
+            )
+        }
+
+        // Unlock next mission
+        val nextMission = campaignMissions.find { it.levelId == levelId + 1 }
+        if (nextMission != null) {
+            nextMission.isUnlocked = true
+        }
+        return true
+    }
+
+    // ==================== LEGACY STRATEGY PROGRESS APIS ====================
 
     fun getProgress(key: String): StrategyProgress {
         return progressMap[key] ?: StrategyProgress(key = key)
@@ -64,6 +285,7 @@ object StrategyMasteryManager {
         var certified = curr.isCertifiedForMultiplayer
         if (newXp >= curr.xpRequired && newTier < 5) {
             newTier++
+            availableSkillPoints += 1
             if (newTier == 5) {
                 certified = true
             }
