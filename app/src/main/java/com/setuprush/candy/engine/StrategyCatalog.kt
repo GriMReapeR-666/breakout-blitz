@@ -1,7 +1,5 @@
 package com.setuprush.candy.engine
 
-typealias StrategyGroup = StrategyCatalog.StrategyFamily
-
 /**
  * Master catalog of all trading strategies and setups across Setup Rush.
  * Encompasses Price Action, Candlesticks, Smart Money Concepts (SMC),

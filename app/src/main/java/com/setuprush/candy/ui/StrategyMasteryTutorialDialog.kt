@@ -37,7 +37,7 @@ fun StrategyMasteryTutorialDialog(
     onLaunchMasteryDrill: (StrategyCatalog.SetupCardData, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedGroup by remember { mutableStateOf(StrategyCatalog.StrategyGroup.SMC) }
+    var selectedGroup by remember { mutableStateOf(StrategyCatalog.StrategyFamily.SMC) }
     val groupSetups = remember(selectedGroup) {
         StrategyCatalog.getSetupsByGroup(selectedGroup)
     }
@@ -100,7 +100,7 @@ fun StrategyMasteryTutorialDialog(
 
                 // Strategy Family Tabs
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(StrategyCatalog.StrategyGroup.values()) { group ->
+                    items(StrategyCatalog.StrategyFamily.values()) { group ->
                         val isSelected = selectedGroup == group
                         Surface(
                             shape = RoundedCornerShape(8.dp),

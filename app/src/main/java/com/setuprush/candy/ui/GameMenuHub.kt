@@ -777,7 +777,7 @@ fun AcademyContent(
     theme: GameTheme,
     onLaunchDrill: (StrategyCatalog.SetupCardData, Int) -> Unit
 ) {
-    var selectedGroup by remember { mutableStateOf(StrategyCatalog.StrategyGroup.SMC) }
+    var selectedGroup by remember { mutableStateOf(StrategyCatalog.StrategyFamily.SMC) }
     val setups = remember(selectedGroup) { StrategyCatalog.getSetupsByGroup(selectedGroup) }
 
     LazyColumn(
@@ -793,7 +793,7 @@ fun AcademyContent(
             )
             Spacer(modifier = Modifier.height(4.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(StrategyCatalog.StrategyGroup.values()) { grp ->
+                items(StrategyCatalog.StrategyFamily.values()) { grp ->
                     val isSel = selectedGroup == grp
                     Surface(
                         shape = RoundedCornerShape(6.dp),

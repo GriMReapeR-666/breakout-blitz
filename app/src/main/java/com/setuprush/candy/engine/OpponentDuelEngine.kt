@@ -61,8 +61,6 @@ object OpponentDuelEngine {
         var isMarginCalled: Boolean = false
     )
 
-    typealias TraderRival = RivalTrader
-
     private val RIVAL_POOL = listOf(
         RivalTrader("rival_1", "Satoshi_Sniper", "TITAN", 2620, "Senior Order Flow Analyst", "⚡"),
         RivalTrader("rival_2", "OrderFlow_King", "APEX", 2590, "Prop Desk Lead Trader", "👑"),

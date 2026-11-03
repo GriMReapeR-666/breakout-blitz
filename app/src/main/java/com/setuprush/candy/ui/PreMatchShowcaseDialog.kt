@@ -40,7 +40,7 @@ fun PreMatchShowcaseDialog(
     val suit = CharacterCustomizationManager.getEquippedSuit()
     val watch = CharacterCustomizationManager.getEquippedWatch()
     val eyewear = CharacterCustomizationManager.getEquippedEyewear()
-    val rival = OpponentDuelEngine.activeRival ?: OpponentDuelEngine.TraderRival(
+    val rival = OpponentDuelEngine.activeRival ?: OpponentDuelEngine.RivalTrader(
         id = "rival_default",
         name = "Satoshi_Sniper",
         deskTag = "TITAN",
