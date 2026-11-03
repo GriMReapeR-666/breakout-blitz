@@ -81,4 +81,29 @@ object PlayerProfileManager {
         val selected = ALL_BADGES.filter { it.id in badgeIds }
         currentProfile = currentProfile.copy(showcaseBadges = selected.take(3))
     }
+
+    fun recordMatch(isWin: Boolean, pnl: Double, rMultiple: Double = 2.0, format: String = "duel", symbol: String = "BTC") {
+        val s = currentProfile.stats
+        val total = s.totalTrades + 1
+        val wins = s.profitableTrades + (if (isWin) 1 else 0)
+        val stops = s.stoppedTrades + (if (!isWin) 1 else 0)
+        val net = s.netPnl + pnl
+        val streak = if (isWin) s.currentStreak + 1 else 0
+        val best = kotlin.math.max(s.bestStreak, streak)
+        val winRate = if (total > 0) wins.toDouble() / total else 0.0
+
+        currentProfile = currentProfile.copy(
+            mmrRating = (currentProfile.mmrRating + (if (isWin) 25 else -15)).coerceAtLeast(1000),
+            experiencePoints = currentProfile.experiencePoints + (if (isWin) 250L else 50L),
+            stats = s.copy(
+                totalTrades = total,
+                profitableTrades = wins,
+                stoppedTrades = stops,
+                winRate = winRate,
+                netPnl = net,
+                bestStreak = best,
+                currentStreak = streak
+            )
+        )
+    }
 }
