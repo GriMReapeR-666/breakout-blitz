@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions tab
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     name: Build Android APK in Cloud
@@ -33,6 +36,16 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Save Build Log to ci-logs branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs
+          git add build.log -f
+          git commit -m "chore: save build log" || true
+          git push origin ci-logs -f
 
       - name: Upload Build Log
         if: always()
