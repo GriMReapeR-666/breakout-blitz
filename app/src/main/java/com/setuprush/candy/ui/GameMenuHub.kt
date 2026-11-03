@@ -915,7 +915,7 @@ fun ArsenalPresetsContent(
             }
         }
 
-        // Card 4: Strategy Mastery Progression (Perks Earned Naturally)
+        // Card 4: Strategy Mastery Progression (Real Discipline Benchmarks)
         item {
             Surface(
                 shape = RoundedCornerShape(12.dp),

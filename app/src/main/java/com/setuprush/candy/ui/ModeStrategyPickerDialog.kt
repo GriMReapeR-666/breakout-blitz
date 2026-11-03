@@ -20,6 +20,7 @@ import com.setuprush.candy.engine.StrategyCatalog
 import com.setuprush.candy.theme.GameTheme
 
 enum class GameMode(val id: String, val displayName: String, val shortDesc: String) {
+    DAILY("daily", "DAILY TAPE", "Global 24H Seed · Standardized Tape"),
     RUSH("rush", "RUSH", "2:00 · Long Only · Max Cash"),
     PRO("pro", "PRO", "2:00 · Long & Short · Full Freedom"),
     BLOWUP("blowup", "BLOW-UP", "Endless · Climbing Leverage · Survive"),

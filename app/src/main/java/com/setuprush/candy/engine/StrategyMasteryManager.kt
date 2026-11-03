@@ -3,10 +3,10 @@ package com.setuprush.candy.engine
 /**
  * Strategy Mastery Progression Engine & Solo Campaign Command.
  * Implements:
- * 1. 7 Strategy Families with 5-Tier Interactive Skill Trees and unlockable perk nodes.
+ * 1. 7 Strategy Families with 5-Tier Trader Skill Benchmarks (Pure discipline, volume & execution precision).
  * 2. 35-Level Solo Player Campaign Missions (5 per strategy family) where the selected setup
  *    ACTUALLY OCCURS on the chart and must be caught by the player to achieve victory.
- * 3. Skill Points (SP) economy and star progression (1 to 3 stars per mission).
+ * 3. 5-Trade Series Certification Protocol (Win rate >= 60%, Net R >= +3.0R, Profit Factor >= 2.0).
  * 4. Backward compatible with all existing StrategyMasteryManager APIs.
  */
 object StrategyMasteryManager {
@@ -52,9 +52,6 @@ object StrategyMasteryManager {
             TraderSkillBenchmark("Trader Rank", "👑", prog.tierTitle, "Earned trading rank based on verified volume, PnL, and discipline.")
         )
     }
-
-    // Backward-compatible adapter
-    fun getPerksForStrategy(key: String): List<TraderSkillBenchmark> = getTraderSkillBenchmarks(key)
 
     data class SoloCampaignMission(
         val levelId: Int, // 1 to 35

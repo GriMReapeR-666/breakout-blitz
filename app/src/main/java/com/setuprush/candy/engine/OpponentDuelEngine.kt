@@ -35,7 +35,10 @@ object OpponentDuelEngine {
         MatchFormat("1v1", "⚔️ 1v1", "PROP DUEL", "Head-to-head match · First to +2R"),
         MatchFormat("5v5", "🛡️ 5v5", "PORTFOLIO CLASH", "Multi-asset fund battle"),
         MatchFormat("tournament", "🏆 100-TRADER", "MARGIN CALL ROYALE", "Last solvent standing"),
-        MatchFormat("solo", "🎯 SOLO", "DESK RUN", "Unlimited backtesting & setup practice")
+        MatchFormat("daily", "📅 24H", "DAILY TAPE", "Standardized global seed for all traders"),
+        MatchFormat("blowup", "💣 ENDLESS", "BLOW-UP COMBINE", "Climbing leverage · Survive liquidation"),
+        MatchFormat("sniper", "🎯 3-BULLET", "SNIPER CONVICTION", "3 high-conviction trades only"),
+        MatchFormat("solo", "📈 SOLO", "STRATEGY DRILL", "Unlimited backtesting & setup practice")
     )
 
     data class RivalTrader(

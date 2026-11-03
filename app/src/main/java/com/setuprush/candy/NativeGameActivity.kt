@@ -289,6 +289,20 @@ fun NativeGameScreen(
                                 if (mission != null) {
                                     lastOutcome = "MISSION ${mission.levelId} FAILED: STOPPED OUT · RETRY"
                                 }
+                                if (currentMode == GameMode.BLOWUP) {
+                                    MatchPerformanceEngine.generateDebrief(
+                                        modeId = "blowup",
+                                        symbol = activeSymbol.id,
+                                        playerTakes = playerTakesCount,
+                                        playerStops = playerStopsCount,
+                                        playerPnl = totalScore,
+                                        playerBestStreak = streak,
+                                        precisionScore = 0.70,
+                                        tradeReviews = sessionTradeReviews.toList()
+                                    )
+                                    showPostMatchDebriefDialog = true
+                                    lastOutcome = "💥 BLOWN UP! COMBINE OVER AT LEVERAGE ${currentLeverage.toInt()}×"
+                                }
                             }
                         }
 
@@ -638,6 +652,22 @@ fun NativeGameScreen(
                         showPostMatchDebriefDialog = true
                     }
                 }
+
+                // Sniper 3-Bullet mode check (Setup Rush Call It parity)
+                if (currentMode == GameMode.SNIPER && sessionTradeReviews.size >= 3) {
+                    MatchPerformanceEngine.generateDebrief(
+                        modeId = "sniper",
+                        symbol = activeSymbol.id,
+                        playerTakes = playerTakesCount,
+                        playerStops = playerStopsCount,
+                        playerPnl = totalScore,
+                        playerBestStreak = streak,
+                        precisionScore = 0.90,
+                        tradeReviews = sessionTradeReviews.toList()
+                    )
+                    showPostMatchDebriefDialog = true
+                    lastOutcome = "🎯 3/3 SNIPER BULLETS SPENT · SESSION COMPLETE"
+                }
             }
         }
 
@@ -650,20 +680,35 @@ fun NativeGameScreen(
                     activeSymbol = sym
                     TradingModelManager.activeTradingModel = model
                     activeStrategyKey = model.setupKey
-                    val isSolo = (formatId == "solo")
-                    engine = SetupEngine(seed = System.currentTimeMillis(), symbol = sym, targetSetupKey = model.setupKey, exclusiveMode = isSolo)
+                    val isCompetitive = (formatId == "1v1" || formatId == "5v5" || formatId == "tournament")
+                    currentMode = when (formatId) {
+                        "daily" -> GameMode.DAILY
+                        "rush" -> GameMode.RUSH
+                        "blowup" -> GameMode.BLOWUP
+                        "sniper" -> GameMode.SNIPER
+                        "solo" -> GameMode.PRACTICE
+                        else -> GameMode.PRO
+                    }
+                    val runSeed = if (formatId == "daily") {
+                        (System.currentTimeMillis() / (24 * 60 * 60 * 1000L)) * 86400000L
+                    } else {
+                        System.currentTimeMillis()
+                    }
+                    engine = SetupEngine(seed = runSeed, symbol = sym, targetSetupKey = model.setupKey, exclusiveMode = (formatId == "solo"))
                     tapePosition = 10.0
                     isPlayerHolding = false
+                    elapsedSeconds = 0.0
+                    currentLeverage = if (formatId == "blowup") 2.0 else model.riskParams.leverageMultiplier
                     SetupExecutionTimingEngine.resetStats()
-                    if (isSolo) {
-                        OpponentDuelEngine.endMatch()
-                        StrategyMasteryManager.startEvaluation(model.setupKey)
-                    } else {
+                    if (isCompetitive) {
                         OpponentDuelEngine.startMatch(formatId, PlayerProfileManager.currentProfile.mmrRating)
                         StrategyMasteryManager.resetEvaluation()
+                    } else {
+                        OpponentDuelEngine.endMatch()
+                        StrategyMasteryManager.startEvaluation(model.setupKey)
                     }
                     showMasterMenuHub = false
-                    showPreMatchShowcase = !isSolo
+                    showPreMatchShowcase = isCompetitive
                     lastOutcome = "COMMENCED ${formatId.uppercase()}: ${sym.id} | SETUP: ${model.setupKey.uppercase()}"
                 },
                 onOpenAcademyDrill = { setup, tier ->
@@ -889,6 +934,7 @@ fun NativeGameScreen(
                     activeDirection = activeDirection,
                     livePnl = livePnl,
                     currentLeverage = currentLeverage,
+                    canShort = currentMode != GameMode.RUSH,
                     theme = theme,
                     onStartLong = performLongEntry,
                     onStartShort = performShortEntry,
@@ -1058,6 +1104,7 @@ fun TacticalHoldToRideBar(
     activeDirection: Int, // 1 = Long, -1 = Short
     livePnl: Double,
     currentLeverage: Double,
+    canShort: Boolean = true,
     theme: com.setuprush.candy.theme.GameTheme,
     onStartLong: () -> Unit,
     onStartShort: () -> Unit,
@@ -1110,8 +1157,8 @@ fun TacticalHoldToRideBar(
                         .weight(1f)
                         .fillMaxHeight()
                         .shadow(if (isShortActive) 10.dp else 4.dp, RoundedCornerShape(12.dp), spotColor = Color(0xFFFF334B))
-                        .pointerInput(isLongActive) {
-                            if (!isLongActive) {
+                        .pointerInput(isLongActive, canShort) {
+                            if (!isLongActive && canShort) {
                                 awaitEachGesture {
                                     awaitFirstDown(requireUnconsumed = false)
                                     onStartShort()
@@ -1173,15 +1220,15 @@ fun TacticalHoldToRideBar(
                                 Text("🔻", fontSize = 16.sp)
                                 Column {
                                     Text(
-                                        text = "SELL / SHORT",
-                                        color = Color(0xFFFF5268).copy(alpha = shortAlpha),
-                                        fontSize = 13.sp,
+                                        text = if (canShort) "SELL / SHORT" else "RUSH: LONG ONLY",
+                                        color = Color(0xFFFF5268).copy(alpha = if (canShort) shortAlpha else 0.3f),
+                                        fontSize = if (canShort) 13.sp else 10.sp,
                                         fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace
                                     )
                                     Text(
-                                        text = "HOLD TO RIDE",
-                                        color = Color(0xFFB57784).copy(alpha = shortAlpha),
+                                        text = if (canShort) "HOLD TO RIDE" else "SHORT LOCKED",
+                                        color = Color(0xFFB57784).copy(alpha = if (canShort) shortAlpha else 0.3f),
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace
