@@ -158,7 +158,12 @@ class SetupEngine(
             val cBar = oBar + stepDrift
             val hBar = max(oBar, cBar) + range * (0.1 + rng() * 0.15)
             val lBar = min(oBar, cBar) - range * (0.1 + rng() * 0.15)
-            candles.add(Candle(oBar, hBar, lBar, cBar, candles[at].v * (0.7 + rng() * 0.5)))
+            val nextIdx = at + step
+            if (nextIdx < candles.size) {
+                candles[nextIdx] = Candle(oBar, hBar, lBar, cBar, candles[nextIdx].v)
+            } else {
+                candles.add(Candle(oBar, hBar, lBar, cBar, candles[at].v * (0.7 + rng() * 0.5)))
+            }
             walkPrice = cBar
         }
     }
@@ -404,15 +409,16 @@ class SetupEngine(
      * Supports sub-pixel continuous horizontal auto-scrolling and exponential vertical price following.
      */
     class ChartCamera(
-        var n: Double = 28.0 // visible candle count
+        var n: Double = 28.0, // visible candle count
+        initialPrice: Double = 100.0
     ) {
-        var right: Double = 0.0 // fractional candle index at right margin
-        var lo: Double = 0.0    // lowest price in view
-        var hi: Double = 1.0    // highest price in view
-        var tLo: Double = 0.0   // target low price
-        var tHi: Double = 1.0   // target high price
+        var right: Double = 15.0 // fractional candle index at right margin
+        var lo: Double = if (initialPrice > 0.0) initialPrice * 0.98 else 0.0
+        var hi: Double = if (initialPrice > 0.0) initialPrice * 1.02 else 1.0
+        var tLo: Double = lo
+        var tHi: Double = hi
         var follow: Boolean = true
-        var showP: Double = 0.0 // exponentially smoothed live price
+        var showP: Double = initialPrice
         var init: Boolean = false
 
         fun update(k: Double, candles: List<Candle>, dt: Double, posEntry: Double? = null) {
@@ -457,7 +463,7 @@ class SetupEngine(
             val targetMinP = minP - pad
             val targetMaxP = maxP + pad
 
-            if (tLo == 0.0 && tHi == 1.0) {
+            if (tLo <= 0.0 || tHi <= tLo) {
                 tLo = targetMinP
                 tHi = targetMaxP
                 lo = targetMinP
@@ -486,19 +492,21 @@ class SetupEngine(
             }
         }
 
-        fun barSpacing(width: Float): Float = width / n.toFloat()
+        fun barSpacing(width: Float): Float = width / max(1f, n.toFloat())
 
         fun barWidth(width: Float): Float = barSpacing(width) * 0.72f
 
         fun xOf(candleIndex: Double, width: Float): Float {
             val spacing = barSpacing(width)
             val x0 = right - n
-            return ((candleIndex - x0).toFloat() + 0.5f) * spacing
+            val raw = ((candleIndex - x0).toFloat() + 0.5f) * spacing
+            return if (raw.isNaN()) 0f else raw.coerceIn(-2000f, width + 2000f)
         }
 
         fun yOf(price: Double, height: Float): Float {
             val range = max(0.0001, hi - lo)
-            return (height - ((price - lo) / range * height)).toFloat()
+            val raw = (height - ((price - lo) / range * height)).toFloat()
+            return if (raw.isNaN()) height / 2f else raw.coerceIn(-2000f, height + 2000f)
         }
     }
 

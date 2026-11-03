@@ -58,27 +58,46 @@ class NativeGameActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Fail-safe crash logger to prevent unhandled background aborts
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("BreakoutBlitzCrash", "FATAL CRASH on thread ${thread.name}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         bridge = NativeBridge(this)
         com.setuprush.candy.engine.SoundEffectManager.initialize(this)
 
         setContent {
             val theme by ThemeManager.currentTheme
             
-            // Sync status and navigation bar color with active theme background
+            // Sync status and navigation bar color with active theme background safely
             DisposableEffect(theme) {
-                window.statusBarColor = android.graphics.Color.argb(
-                    (theme.bg.alpha * 255).toInt(),
-                    (theme.bg.red * 255).toInt(),
-                    (theme.bg.green * 255).toInt(),
-                    (theme.bg.blue * 255).toInt()
-                )
-                window.navigationBarColor = window.statusBarColor
+                try {
+                    window.statusBarColor = android.graphics.Color.argb(
+                        (theme.bg.alpha * 255).toInt(),
+                        (theme.bg.red * 255).toInt(),
+                        (theme.bg.green * 255).toInt(),
+                        (theme.bg.blue * 255).toInt()
+                    )
+                    window.navigationBarColor = window.statusBarColor
+                } catch (e: Throwable) {
+                    // Safe fallback for OEM ROMs with restricted system bar manipulation
+                }
                 onDispose {}
             }
 
-            NativeGameScreen(
-                bridge = bridge
-            )
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = theme.bg
+                ) {
+                    NativeGameScreen(
+                        bridge = bridge
+                    )
+                }
+            }
         }
     }
 
@@ -98,7 +117,13 @@ fun NativeGameScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     var activeSymbol by remember { mutableStateOf(MarketSymbolCatalog.activeSymbol) }
     var engine by remember { mutableStateOf(SetupEngine(seed = System.currentTimeMillis(), symbol = activeSymbol)) }
-    val camera = remember { SetupEngine.ChartCamera() }
+    val camera = remember(engine) {
+        SetupEngine.ChartCamera(initialPrice = activeSymbol.basePrice).apply {
+            if (engine.candles.isNotEmpty()) {
+                update(10.0, engine.candles, 0.016)
+            }
+        }
+    }
 
     var tapePosition by remember { mutableDoubleStateOf(10.0) }
     var totalScore by remember { mutableDoubleStateOf(10000.0) } // Default career bank $10,000

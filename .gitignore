@@ -39,6 +39,7 @@ captures/
 # Keystore files
 *.jks
 *.keystore
+!keystore/debug.keystore
 
 # External reference archives & local test runners
 .chrome-test-profile/

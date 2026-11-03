@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.util.Log
+import com.setuprush.candy.R
 
 /**
  * 100% Native Procedural Audio & Sound Effects Manager.
@@ -41,25 +42,17 @@ object SoundEffectManager {
                 .setAudioAttributes(audioAttrs)
                 .build()
 
-            val res = context.resources
-            val pkg = context.packageName
+            try {
+                soundTickId = soundPool?.load(context, R.raw.sfx_tick, 1) ?: 0
+                soundCashoutId = soundPool?.load(context, R.raw.sfx_cashout, 1) ?: 0
+                soundStopLossId = soundPool?.load(context, R.raw.sfx_stop_loss, 1) ?: 0
+                soundCountdownId = soundPool?.load(context, R.raw.sfx_countdown, 1) ?: 0
+                soundVictoryId = soundPool?.load(context, R.raw.sfx_victory, 1) ?: 0
+            } catch (e: Throwable) {
+                Log.w(TAG, "Audio asset loading warning", e)
+            }
 
-            val idTick = res.getIdentifier("sfx_tick", "raw", pkg)
-            if (idTick != 0) soundTickId = soundPool?.load(context, idTick, 1) ?: 0
-
-            val idCashout = res.getIdentifier("sfx_cashout", "raw", pkg)
-            if (idCashout != 0) soundCashoutId = soundPool?.load(context, idCashout, 1) ?: 0
-
-            val idStopLoss = res.getIdentifier("sfx_stop_loss", "raw", pkg)
-            if (idStopLoss != 0) soundStopLossId = soundPool?.load(context, idStopLoss, 1) ?: 0
-
-            val idCountdown = res.getIdentifier("sfx_countdown", "raw", pkg)
-            if (idCountdown != 0) soundCountdownId = soundPool?.load(context, idCountdown, 1) ?: 0
-
-            val idVictory = res.getIdentifier("sfx_victory", "raw", pkg)
-            if (idVictory != 0) soundVictoryId = soundPool?.load(context, idVictory, 1) ?: 0
-
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to initialize SoundPool", e)
         }
     }

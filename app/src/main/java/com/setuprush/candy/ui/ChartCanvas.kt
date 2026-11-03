@@ -50,7 +50,7 @@ fun ChartCanvas(
     candles: List<Candle>,
     tapePosition: Double,
     theme: GameTheme = ThemeManager.currentTheme.value,
-    camera: SetupEngine.ChartCamera = remember { SetupEngine.ChartCamera() },
+    camera: SetupEngine.ChartCamera = remember { SetupEngine.ChartCamera(initialPrice = 100.0) },
     activeSetup: SetupRecord? = null,
     supertrendEnabled: Boolean = true,
     structureEnabled: Boolean = true,
