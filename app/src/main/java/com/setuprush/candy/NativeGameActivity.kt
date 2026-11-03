@@ -463,10 +463,6 @@ fun NativeGameScreen(
                 }
             }
         }
-                    }
-                }
-            }
-        }
     ) { innerPadding ->
         val performLongEntry = {
             if (!isPlayerHolding) {
