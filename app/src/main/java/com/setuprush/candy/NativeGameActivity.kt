@@ -160,6 +160,7 @@ fun NativeGameScreen(
     var showTradingDeskLobbyDialog by remember { mutableStateOf(false) }
     var showMasteryTutorialDialog by remember { mutableStateOf(false) }
     var showPostMatchDebriefDialog by remember { mutableStateOf(false) }
+    val sessionTradeReviews = remember { mutableStateListOf<MatchPerformanceEngine.TradeReviewRecord>() }
 
     var currentMode by remember { mutableStateOf(GameMode.PRO) }
     var currentLevel by remember { mutableStateOf(DeskLevel.DESK_2) }
@@ -263,6 +264,21 @@ fun NativeGameScreen(
                                     entryPrice = tradeEntryPrice,
                                     exitPrice = curPrice,
                                     timingGrade = "STOPPED_OUT"
+                                )
+                                sessionTradeReviews.add(
+                                    MatchPerformanceEngine.TradeReviewRecord(
+                                        tradeNumber = sessionTradeReviews.size + 1,
+                                        setupName = activeSetup?.name ?: "Market Setup",
+                                        direction = activeDirection,
+                                        entryPrice = tradeEntryPrice,
+                                        exitPrice = curPrice,
+                                        pnl = pnl,
+                                        rMultiple = -1.0,
+                                        timingBadge = "🛑 STOPPED OUT",
+                                        mistakeCategory = MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP,
+                                        mistakeDiagnosis = "Loss contained to planned 1.0R risk budget.",
+                                        actionableSolution = "Taking small planned losses preserves capital. Wait for next valid setup."
+                                    )
                                 )
                                 activeStrategyKey?.let {
                                     StrategyMasteryManager.recordTrade(it, isWin = false)
@@ -453,7 +469,7 @@ fun NativeGameScreen(
                         }
                     ) {
                         Text(
-                            text = if (showMasterMenuHub) "▶ GAME" else "◀ HQ",
+                            text = if (showMasterMenuHub) "▶ GAME" else "◀ DESK",
                             color = if (showMasterMenuHub) Color.White else Color(0xFFFFC700),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Black,
@@ -516,6 +532,49 @@ fun NativeGameScreen(
                     timingGrade = "CLEAN"
                 )
 
+                // Record into Trade Review Ledger
+                val timingGrade = SetupExecutionTimingEngine.currentFeedback?.grade ?: SetupExecutionTimingEngine.ExecutionTimingGrade.GOOD_ENTRY
+                val mistakeCat = when {
+                    !isWin && timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.LATE_ENTRY -> MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY
+                    !isWin && timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.FOMO_EARLY -> MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY
+                    !isWin -> MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP
+                    isWin && pnl < 100.0 -> MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT
+                    else -> MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS
+                }
+                val diag = when (mistakeCat) {
+                    MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY -> "Entered late after market expansion; unfavorable risk:reward."
+                    MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY -> "Entered before setup confirmation closed; trapped on false wick."
+                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Cashed out at +0.5R, leaving +1.5R on the table."
+                    MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP -> "Disciplined exit; loss contained to planned 1.0R risk."
+                    MatchPerformanceEngine.MistakeCategory.STOP_LOSS_IGNORED -> "Drawdown exceeded planned invalidation."
+                    MatchPerformanceEngine.MistakeCategory.COUNTER_TREND -> "Executed counter to higher timeframe momentum."
+                    MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Clean execution and disciplined exit at target."
+                }
+                val sol = when (mistakeCat) {
+                    MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY -> "Never chase. Wait for the retest pullback into the zone or pass."
+                    MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY -> "Wait for candle confirmation close before entering."
+                    MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT -> "Shift stop to breakeven at +1R and hold for the full target."
+                    MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP -> "Taking small planned losses is normal. Prepare for next setup."
+                    MatchPerformanceEngine.MistakeCategory.STOP_LOSS_IGNORED -> "Cut losses immediately at invalidation price."
+                    MatchPerformanceEngine.MistakeCategory.COUNTER_TREND -> "Align entries with the Tactical Confirmation Trigger."
+                    MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Optimal execution. Repeat this exact trade process."
+                }
+                sessionTradeReviews.add(
+                    MatchPerformanceEngine.TradeReviewRecord(
+                        tradeNumber = sessionTradeReviews.size + 1,
+                        setupName = activeSetup?.name ?: "Market Setup",
+                        direction = activeDirection,
+                        entryPrice = tradeEntryPrice,
+                        exitPrice = exitP,
+                        pnl = pnl,
+                        rMultiple = rMult,
+                        timingBadge = timingGrade.badge + " " + timingGrade.title,
+                        mistakeCategory = mistakeCat,
+                        mistakeDiagnosis = diag,
+                        actionableSolution = sol
+                    )
+                )
+
                 if (isWin) {
                     streak++
                     playerTakesCount++
@@ -566,7 +625,8 @@ fun NativeGameScreen(
                             playerStops = playerStopsCount,
                             playerPnl = totalScore,
                             playerBestStreak = streak,
-                            precisionScore = 0.85
+                            precisionScore = 0.85,
+                            tradeReviews = sessionTradeReviews.toList()
                         )
                         showPostMatchDebriefDialog = true
                     }
@@ -735,7 +795,7 @@ fun NativeGameScreen(
                                     )
                                 } else {
                                     Text(
-                                        text = "⚡ DESK COMBAT · ALL SETUPS",
+                                        text = "⚡ LIVE DESK · ALL SETUPS",
                                         color = theme.muted,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
@@ -929,7 +989,8 @@ fun NativeGameScreen(
                 playerStops = playerStopsCount,
                 playerPnl = totalScore,
                 playerBestStreak = max(1, streak),
-                precisionScore = 0.84
+                precisionScore = 0.84,
+                tradeReviews = sessionTradeReviews.toList()
             )
             PostMatchDebriefDialog(
                 theme = theme,
@@ -939,6 +1000,7 @@ fun NativeGameScreen(
                     tapePosition = 10.0
                     playerTakesCount = 0
                     playerStopsCount = 0
+                    sessionTradeReviews.clear()
                     if (OpponentDuelEngine.isCompetitiveActive) {
                         OpponentDuelEngine.startMatch("1v1", PlayerProfileManager.currentProfile.mmrRating)
                     }
@@ -946,9 +1008,16 @@ fun NativeGameScreen(
                 },
                 onOpenLobby = {
                     showPostMatchDebriefDialog = false
-                    showTradingDeskLobbyDialog = true
+                    showMasterMenuHub = true
                 },
-                onDismiss = { showPostMatchDebriefDialog = false }
+                onDismiss = { showPostMatchDebriefDialog = false },
+                onReplayTape = {
+                    showPostMatchDebriefDialog = false
+                    tapePosition = kotlin.math.max(10.0, tapePosition - 35.0)
+                    isTapePaused = true
+                    tapeSpeedMultiplier = 0.5f
+                    lastOutcome = "⏪ REPLAYING TAPE AT 0.5× · USE SPEED PILL TO SCRUB"
+                }
             )
         }
 

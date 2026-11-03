@@ -23,6 +23,35 @@ object StrategyMasteryManager {
     ) {
         val winRate: Double
             get() = if (winCount + lossCount == 0) 0.0 else winCount.toDouble() / (winCount + lossCount)
+        val tierTitle: String
+            get() = when (tier) {
+                1 -> "NOVICE TRADER"
+                2 -> "APPRENTICE"
+                3 -> "PROP MASTER"
+                4 -> "QUANT ANALYST"
+                5 -> "APEX GRANDMASTER"
+                else -> "MASTER TRADER"
+            }
+    }
+
+    /** Unlocked naturally through strategy mastery progression (No arbitrary skill tree) */
+    data class StrategyMasteryPerk(
+        val tier: Int,
+        val title: String,
+        val icon: String,
+        val description: String,
+        val isUnlocked: Boolean
+    )
+
+    fun getPerksForStrategy(key: String): List<StrategyMasteryPerk> {
+        val prog = getProgress(key)
+        return listOf(
+            StrategyMasteryPerk(1, "Pattern Reticle", "👁️", "Highlights setup formation candle on tape with tactical reticle.", prog.tier >= 1),
+            StrategyMasteryPerk(2, "Sniper Precision", "🎯", "+25% payout bonus when executing within 2 candles of trigger zone.", prog.tier >= 2),
+            StrategyMasteryPerk(3, "Trailing Guard", "🛡️", "Automatically shifts stop loss to breakeven when trade reaches +1R.", prog.tier >= 3),
+            StrategyMasteryPerk(4, "Order Flow Shield", "⚡", "Institutional volume filter dampens false breakout whipsaws.", prog.tier >= 4),
+            StrategyMasteryPerk(5, "50x Lev Overdrive", "👑", "Unlocks 50x max leverage and certifies setup for ranked prop duels.", prog.tier >= 5)
+        )
     }
 
     data class SkillTreeNode(

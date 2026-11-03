@@ -67,8 +67,17 @@ object TradingModelManager {
         val confluenceIndicatorId: String,
         val targetSymbolId: String, // "BTC", "ETH", "SOL", "SUI", "GOLD", "DOGE"
         val orderType: ExecutionOrderType,
-        val leverage: Double, // 2x, 3x, 5x, 10x
-        val riskProtocol: RiskManagementProtocol
+        val leverage: Double, // 2x, 3x, 5x, 10x, 25x, 50x
+        val riskProtocol: RiskManagementProtocol,
+        val stopLossBufferR: Double = 1.0, // 0.8R (Tight), 1.0R (Standard), 1.5R (Wide Buffer)
+        val takeProfitTargetR: Double = 2.0 // 1.5R (Quick Scalp), 2.0R (Standard), 3.0R (Runner)
+    )
+
+    /** 5 Saved Strategy Preset Slots (Tactical Trading Deck) */
+    data class StrategyPresetSlot(
+        val slotIndex: Int, // 1 to 5
+        var slotName: String,
+        var model: CustomTradingModel
     )
 
     /** Prebuilt Standard Trading Models */
@@ -174,10 +183,45 @@ object TradingModelManager {
         )
     )
 
-    var activeTradingModel: CustomTradingModel = PREBUILT_MODELS[0]
+    /** 5 Saved Strategy Preset Slots (Analogy to Tactical Weapon Loadout Presets) */
+    val PRESET_SLOTS = mutableListOf(
+        StrategyPresetSlot(1, "PRESET 1: SMC FVG ALPHA", PREBUILT_MODELS[0]),
+        StrategyPresetSlot(2, "PRESET 2: TREND RUNNER", PREBUILT_MODELS[1]),
+        StrategyPresetSlot(3, "PRESET 3: BREAK & RETEST", PREBUILT_MODELS[4]),
+        StrategyPresetSlot(4, "PRESET 4: LIQUIDITY SWEEP", PREBUILT_MODELS[3]),
+        StrategyPresetSlot(5, "PRESET 5: SQUEEZE BREAKOUT", PREBUILT_MODELS[6])
+    )
+
+    var activePresetSlotIndex: Int = 1
+
+    val activePreset: StrategyPresetSlot
+        get() = PRESET_SLOTS.getOrNull(activePresetSlotIndex - 1) ?: PRESET_SLOTS[0]
+
+    var activeTradingModel: CustomTradingModel
+        get() = activePreset.model
+        set(value) {
+            activePreset.model = value
+        }
+
+    fun selectPreset(slotIndex: Int) {
+        val clamped = slotIndex.coerceIn(1, 5)
+        activePresetSlotIndex = clamped
+    }
+
+    fun updatePresetSlot(slotIndex: Int, model: CustomTradingModel) {
+        val idx = (slotIndex - 1).coerceIn(0, PRESET_SLOTS.size - 1)
+        PRESET_SLOTS[idx].model = model
+    }
+
+    fun renamePreset(slotIndex: Int, newName: String) {
+        val idx = (slotIndex - 1).coerceIn(0, PRESET_SLOTS.size - 1)
+        PRESET_SLOTS[idx].slotName = newName.trim()
+    }
 
     fun selectModel(id: String) {
-        PREBUILT_MODELS.find { it.id == id }?.let { activeTradingModel = it }
+        PREBUILT_MODELS.find { it.id == id }?.let {
+            activePreset.model = it
+        }
     }
 
     fun saveModel(model: CustomTradingModel) {

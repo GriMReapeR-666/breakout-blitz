@@ -44,6 +44,30 @@ object MatchPerformanceEngine {
         val xpBonus: Int
     )
 
+    enum class MistakeCategory(val label: String, val badge: String) {
+        NONE_FLAWLESS("FLAWLESS EXECUTION", "🎯"),
+        CHASED_ENTRY("CHASED EXTENDED MOVE", "⚠️"),
+        PREMATURE_EXIT("PREMATURE CASH-OUT", "⏳"),
+        UNCONFIRMED_EARLY("PREMATURE FOMO", "❌"),
+        STOP_LOSS_IGNORED("STOP-LOSS IGNORED", "🛑"),
+        COUNTER_TREND("COUNTER-TREND BIAS", "🌪️"),
+        DISCIPLINED_STOP("DISCIPLINED INVALIDATION", "🛡️")
+    }
+
+    data class TradeReviewRecord(
+        val tradeNumber: Int,
+        val setupName: String,
+        val direction: Int, // 1 for LONG, -1 for SHORT
+        val entryPrice: Double,
+        val exitPrice: Double,
+        val pnl: Double,
+        val rMultiple: Double,
+        val timingBadge: String,
+        val mistakeCategory: MistakeCategory,
+        val mistakeDiagnosis: String,
+        val actionableSolution: String
+    )
+
     data class TraderMatchStats(
         val traderId: String,
         val name: String,
@@ -94,7 +118,8 @@ object MatchPerformanceEngine {
         val mmrChange: Int,
         val xpEarned: Int,
         val performanceGrade: String, // A+, A, B, C, F
-        val feedbackSummary: String
+        val feedbackSummary: String,
+        val tradeReviews: List<TradeReviewRecord> = emptyList()
     )
 
     // Pre-configured Daily & Mode-Specific Challenges
@@ -174,7 +199,8 @@ object MatchPerformanceEngine {
         playerStops: Int,
         playerPnl: Double,
         playerBestStreak: Int,
-        precisionScore: Double = 0.82
+        precisionScore: Double = 0.82,
+        tradeReviews: List<TradeReviewRecord> = emptyList()
     ): MatchDebrief {
         val totalTrades = max(1, playerTakes + playerStops)
         val winRate = (playerTakes.toDouble() / totalTrades.toDouble()) * 100.0
@@ -264,7 +290,8 @@ object MatchPerformanceEngine {
             mmrChange = mmrDelta,
             xpEarned = xpDelta + medals.sumOf { it.xpBonus },
             performanceGrade = grade,
-            feedbackSummary = enhancedSummary
+            feedbackSummary = enhancedSummary,
+            tradeReviews = tradeReviews
         )
 
         lastDebrief = debrief

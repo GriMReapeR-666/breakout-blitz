@@ -40,8 +40,10 @@ fun PostMatchDebriefDialog(
     debrief: MatchPerformanceEngine.MatchDebrief,
     onPlayAgain: () -> Unit,
     onOpenLobby: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onReplayTape: () -> Unit = {}
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Stats & Scoreboard, 1 = Trade Review
     val p = debrief.playerStats
     val isVictory = debrief.outcome == MatchPerformanceEngine.MatchOutcome.VICTORY ||
             debrief.outcome == MatchPerformanceEngine.MatchOutcome.SOLE_SURVIVOR ||
@@ -146,8 +148,209 @@ fun PostMatchDebriefDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
+                // ==================== TAB SWITCHER ====================
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectedTab == 0) theme.bull.copy(alpha = 0.2f) else theme.grid.copy(alpha = 0.1f),
+                        border = BorderStroke(1.dp, if (selectedTab == 0) theme.bull else theme.grid.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedTab = 0 }
+                    ) {
+                        Text(
+                            text = "📊 STATS & SCOREBOARD",
+                            color = if (selectedTab == 0) theme.bull else theme.muted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectedTab == 1) theme.bull.copy(alpha = 0.2f) else theme.grid.copy(alpha = 0.1f),
+                        border = BorderStroke(1.dp, if (selectedTab == 1) theme.bull else theme.grid.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedTab = 1 }
+                    ) {
+                        Text(
+                            text = "📋 TRADE REVIEW (${debrief.tradeReviews.size})",
+                            color = if (selectedTab == 1) theme.bull else theme.muted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (selectedTab == 1) {
+                    // ==================== TRADE REVIEW & MISTAKE POST-MORTEM ====================
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        if (debrief.tradeReviews.isEmpty()) {
+                            item {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = theme.grid.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.25f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text("📋", fontSize = 28.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "NO EXECUTED TRADES IN SESSION",
+                                            color = theme.text,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Execute trades using BUY / SELL buttons to review execution quality and post-mortem leak diagnosis.",
+                                            color = theme.muted,
+                                            fontSize = 10.sp,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(debrief.tradeReviews) { tr ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = theme.grid.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, if (tr.pnl >= 0) theme.bull.copy(alpha = 0.35f) else theme.bear.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        // Header Row: Trade #, Direction, PnL & R
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (tr.direction == 1) theme.bull.copy(alpha = 0.2f) else theme.bear.copy(alpha = 0.2f)
+                                                ) {
+                                                    Text(
+                                                        text = if (tr.direction == 1) "LONG" else "SHORT",
+                                                        color = if (tr.direction == 1) theme.bull else theme.bear,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "TRADE #${tr.tradeNumber} · ${tr.setupName}",
+                                                    color = theme.text,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            Text(
+                                                text = "${if (tr.pnl >= 0) "+$" else "-$"}${String.format("%.2f", abs(tr.pnl))} (${if (tr.rMultiple >= 0) "+" else ""}${String.format("%.1f", tr.rMultiple)}R)",
+                                                color = if (tr.pnl >= 0) theme.bull else theme.bear,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // Prices & Timing Badge
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "ENTRY: ${String.format("%.2f", tr.entryPrice)} → EXIT: ${String.format("%.2f", tr.exitPrice)}",
+                                                color = theme.muted,
+                                                fontSize = 9.5.sp
+                                            )
+                                            Text(
+                                                text = tr.timingBadge,
+                                                color = theme.text,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // Mistake Diagnosis & Actionable Solution
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = theme.bg.copy(alpha = 0.6f),
+                                            border = BorderStroke(0.5.dp, theme.grid.copy(alpha = 0.25f)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(tr.mistakeCategory.badge, fontSize = 11.sp)
+                                                    Text(
+                                                        text = tr.mistakeCategory.label,
+                                                        color = if (tr.mistakeCategory == MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS ||
+                                                            tr.mistakeCategory == MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP) theme.bull else theme.bear,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Black
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = tr.mistakeDiagnosis,
+                                                    color = theme.text,
+                                                    fontSize = 9.5.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(3.dp))
+                                                Text(
+                                                    text = "💡 SOLUTION: ${tr.actionableSolution}",
+                                                    color = theme.bull,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
                 // Scrollable metrics, scoreboard, and challenges
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -173,7 +376,7 @@ fun PostMatchDebriefDialog(
                         ) {
                             MetricCard(
                                 title = "TAKE-PROFITS",
-                                subtitle = "KILLS / TP",
+                                subtitle = "TARGETS (+2R)",
                                 value = "${p.takeProfits}",
                                 color = theme.bull,
                                 theme = theme,
@@ -181,7 +384,7 @@ fun PostMatchDebriefDialog(
                             )
                             MetricCard(
                                 title = "STOP-OUTS",
-                                subtitle = "DEATHS / SL",
+                                subtitle = "STOP-OUTS (-1R)",
                                 value = "${p.stopOuts}",
                                 color = if (p.stopOuts == 0) theme.bull else theme.bear,
                                 theme = theme,
@@ -222,7 +425,7 @@ fun PostMatchDebriefDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text("DAMAGE / R-VOLUME:", color = theme.muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Text("CAPTURED R-VOLUME:", color = theme.muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     Text(
                                         text = "${if (p.rMultiplesCaptured >= 0) "+" else ""}${String.format("%.1f", p.rMultiplesCaptured)}R",
                                         color = if (p.rMultiplesCaptured >= 0) theme.bull else theme.bear,
@@ -240,7 +443,7 @@ fun PostMatchDebriefDialog(
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("KILLSTREAK / BEST RUN:", color = theme.muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Text("WIN STREAK:", color = theme.muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     Text(
                                         text = "${p.bestStreak} WINS 🔥",
                                         color = theme.text,
@@ -565,11 +768,13 @@ fun PostMatchDebriefDialog(
                     }
                 }
 
+                } // End of tab 0 (Stats & Scoreboard)
+
                 // ==================== 7. ACTION BUTTONS ====================
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Button(
                         onClick = {
@@ -580,9 +785,25 @@ fun PostMatchDebriefDialog(
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp)
+                            .height(44.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
-                        Text("DESK LOBBY", color = theme.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("DESK LOBBY", color = theme.text, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            onReplayTape()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.grid.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(44.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Text("⏪ REPLAY TAPE", color = theme.text, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -593,13 +814,14 @@ fun PostMatchDebriefDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = theme.bull),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .weight(1.5f)
-                            .height(46.dp)
+                            .weight(1.3f)
+                            .height(44.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         Text(
-                            text = "NEXT MATCH / REMATCH ⚡",
+                            text = "NEXT MATCH ⚡",
                             color = if (theme.isLight) Color.White else Color.Black,
-                            fontSize = 11.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Black
                         )
                     }
