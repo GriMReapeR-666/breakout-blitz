@@ -31,7 +31,15 @@ jobs:
 
       - name: Build Debug APK
         run: |
+          set -o pipefail
           ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Logs
+          path: build.log
 
       - name: Report Build Logs to Summary
         if: always()
@@ -44,16 +52,8 @@ jobs:
           fi
 
       - name: Upload Installable APK Artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: BreakoutBlitz-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Failure-Log
-          path: build.log
