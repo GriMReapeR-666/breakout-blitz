@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="candy_background">#120D18</color>
+    <color name="candy_surface">#1C1524</color>
+    <color name="candy_primary">#FF4081</color>
+    <color name="candy_cyan">#00E5FF</color>
+    <color name="candy_yellow">#FFD600</color>
+    <color name="candy_text">#F8F7FA</color>
+</resources>

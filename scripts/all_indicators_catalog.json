@@ -1,0 +1,546 @@
+[
+  {
+    "id": "supertrend",
+    "name": "Supertrend",
+    "short": "ST",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Supertrend\", overlay=true)"
+  },
+  {
+    "id": "structure",
+    "name": "Market Structure",
+    "short": "BOS",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Market Structure\", overlay=true, max_lines_count=60, max_labels_count=60)"
+  },
+  {
+    "id": "fvg",
+    "name": "Fair Value Gaps",
+    "short": "FVG",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Fair Value Gaps\", overlay=true, max_boxes_count=60)"
+  },
+  {
+    "id": "orderblocks",
+    "name": "Order Blocks",
+    "short": "OB",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Order Blocks\", overlay=true, max_boxes_count=40)"
+  },
+  {
+    "id": "volprofile",
+    "name": "Volume Profile",
+    "short": "VP",
+    "pane": false,
+    "tag": "Volume",
+    "title_line": "indicator(\"Volume Profile\", overlay=true, max_boxes_count=60, max_lines_count=4)"
+  },
+  {
+    "id": "levels",
+    "name": "Support & Resistance",
+    "short": "S/R",
+    "pane": false,
+    "tag": "Levels",
+    "title_line": "indicator(\"Support & Resistance\", overlay=true, max_lines_count=20, max_labels_count=20)"
+  },
+  {
+    "id": "bbands",
+    "name": "Bollinger Bands",
+    "short": "BB",
+    "pane": false,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Bollinger Bands\", overlay=true)"
+  },
+  {
+    "id": "ichimoku",
+    "name": "Ichimoku Cloud",
+    "short": "ICH",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Ichimoku Cloud\", overlay=true)"
+  },
+  {
+    "id": "vwap",
+    "name": "VWAP",
+    "short": "VWAP",
+    "pane": false,
+    "tag": "Volume",
+    "title_line": "indicator(\"VWAP\", overlay=true)"
+  },
+  {
+    "id": "ribbon",
+    "name": "EMA Ribbon",
+    "short": "EMA",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"EMA Ribbon\", overlay=true)"
+  },
+  {
+    "id": "heikin",
+    "name": "Heikin Ashi",
+    "short": "HA",
+    "pane": false,
+    "tag": "Look",
+    "title_line": "indicator(\"Heikin Ashi\", overlay=true)"
+  },
+  {
+    "id": "rsi",
+    "name": "RSI",
+    "short": "RSI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"RSI\", overlay=false)"
+  },
+  {
+    "id": "macd",
+    "name": "MACD",
+    "short": "MACD",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"MACD\", overlay=false)"
+  },
+  {
+    "id": "squeeze",
+    "name": "Squeeze Momentum",
+    "short": "SQZ",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Squeeze Momentum\", overlay=false)"
+  },
+  {
+    "id": "wavetrend",
+    "name": "WaveTrend",
+    "short": "WT",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"WaveTrend\", overlay=false)"
+  },
+  {
+    "id": "emacross",
+    "name": "EMA 50/200 Cross",
+    "short": "GX",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"EMA 50/200 Cross\", overlay=true)"
+  },
+  {
+    "id": "hull",
+    "name": "Hull MA",
+    "short": "HMA",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Hull MA\", overlay=true)"
+  },
+  {
+    "id": "psar",
+    "name": "Parabolic SAR",
+    "short": "SAR",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Parabolic SAR\", overlay=true)"
+  },
+  {
+    "id": "keltner",
+    "name": "Keltner Channels",
+    "short": "KC",
+    "pane": false,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Keltner Channels\", overlay=true)"
+  },
+  {
+    "id": "donchian",
+    "name": "Donchian Channels",
+    "short": "DC",
+    "pane": false,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Donchian Channels\", overlay=true)"
+  },
+  {
+    "id": "chandelier",
+    "name": "Chandelier Exit",
+    "short": "CE",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Chandelier Exit\", overlay=true)"
+  },
+  {
+    "id": "alligator",
+    "name": "Williams Alligator",
+    "short": "ALLI",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Williams Alligator\", overlay=true)"
+  },
+  {
+    "id": "tema",
+    "name": "TEMA / DEMA",
+    "short": "TEMA",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"TEMA / DEMA\", overlay=true)"
+  },
+  {
+    "id": "linreg",
+    "name": "LinReg Channel",
+    "short": "LRC",
+    "pane": false,
+    "tag": "Levels",
+    "title_line": "indicator(\"Linear Regression Channel\", overlay=true, max_lines_count=3)"
+  },
+  {
+    "id": "envelope",
+    "name": "MA Envelope",
+    "short": "ENV",
+    "pane": false,
+    "tag": "Volatility",
+    "title_line": "indicator(\"MA Envelope\", overlay=true)"
+  },
+  {
+    "id": "pivots",
+    "name": "Pivot Points",
+    "short": "PP",
+    "pane": false,
+    "tag": "Levels",
+    "title_line": "indicator(\"Pivot Points\", overlay=true)"
+  },
+  {
+    "id": "fib",
+    "name": "Auto Fibonacci",
+    "short": "FIB",
+    "pane": false,
+    "tag": "Levels",
+    "title_line": "indicator(\"Auto Fibonacci\", overlay=true, max_lines_count=10, max_labels_count=10)"
+  },
+  {
+    "id": "zigzag",
+    "name": "ZigZag",
+    "short": "ZZ",
+    "pane": false,
+    "tag": "Levels",
+    "title_line": "indicator(\"ZigZag\", overlay=true, max_lines_count=100)"
+  },
+  {
+    "id": "stoch",
+    "name": "Stochastic",
+    "short": "STO",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Stochastic\", overlay=false)"
+  },
+  {
+    "id": "stochrsi",
+    "name": "Stochastic RSI",
+    "short": "SRSI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Stochastic RSI\", overlay=false)"
+  },
+  {
+    "id": "cci",
+    "name": "CCI",
+    "short": "CCI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"CCI\", overlay=false)"
+  },
+  {
+    "id": "williams",
+    "name": "Williams %R",
+    "short": "%R",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Williams %R\", overlay=false)"
+  },
+  {
+    "id": "adx",
+    "name": "ADX / DMI",
+    "short": "ADX",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"ADX / DMI\", overlay=false)"
+  },
+  {
+    "id": "ao",
+    "name": "Awesome Oscillator",
+    "short": "AO",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Awesome Oscillator\", overlay=false)"
+  },
+  {
+    "id": "mom",
+    "name": "Momentum / ROC",
+    "short": "ROC",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Momentum / ROC\", overlay=false)"
+  },
+  {
+    "id": "trix",
+    "name": "TRIX",
+    "short": "TRIX",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"TRIX\", overlay=false)"
+  },
+  {
+    "id": "tsi",
+    "name": "True Strength Index",
+    "short": "TSI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"True Strength Index\", overlay=false)"
+  },
+  {
+    "id": "ultosc",
+    "name": "Ultimate Oscillator",
+    "short": "UO",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Ultimate Oscillator\", overlay=false)"
+  },
+  {
+    "id": "aroon",
+    "name": "Aroon",
+    "short": "ARN",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Aroon\", overlay=false)"
+  },
+  {
+    "id": "vortex",
+    "name": "Vortex",
+    "short": "VI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Vortex\", overlay=false)"
+  },
+  {
+    "id": "chop",
+    "name": "Choppiness Index",
+    "short": "CHOP",
+    "pane": true,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Choppiness Index\", overlay=false)"
+  },
+  {
+    "id": "atrpane",
+    "name": "ATR",
+    "short": "ATR",
+    "pane": true,
+    "tag": "Volatility",
+    "title_line": "indicator(\"ATR\", overlay=false)"
+  },
+  {
+    "id": "bbwidth",
+    "name": "Bollinger Width",
+    "short": "BBW",
+    "pane": true,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Bollinger Width\", overlay=false)"
+  },
+  {
+    "id": "obv",
+    "name": "On-Balance Volume",
+    "short": "OBV",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"On-Balance Volume\", overlay=false)"
+  },
+  {
+    "id": "mfi",
+    "name": "Money Flow Index",
+    "short": "MFI",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"Money Flow Index\", overlay=false)"
+  },
+  {
+    "id": "cmf",
+    "name": "Chaikin Money Flow",
+    "short": "CMF",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"Chaikin Money Flow\", overlay=false)"
+  },
+  {
+    "id": "relvol",
+    "name": "Relative Volume",
+    "short": "RVOL",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"Relative Volume\", overlay=false)"
+  },
+  {
+    "id": "volosc",
+    "name": "Volume Oscillator",
+    "short": "VO",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"Volume Oscillator\", overlay=false)"
+  },
+  {
+    "id": "sweeps",
+    "name": "Liquidity Sweeps",
+    "short": "SWP",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Liquidity Sweeps\", overlay=true)"
+  },
+  {
+    "id": "eqhl",
+    "name": "Equal Highs & Lows",
+    "short": "EQ",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Equal Highs & Lows\", overlay=true, max_lines_count=60)"
+  },
+  {
+    "id": "premium",
+    "name": "Premium / Discount",
+    "short": "P/D",
+    "pane": false,
+    "tag": "Smart money",
+    "title_line": "indicator(\"Premium / Discount\", overlay=true)"
+  },
+  {
+    "id": "sessions",
+    "name": "Session VWAP Bands",
+    "short": "SVB",
+    "pane": false,
+    "tag": "Volume",
+    "title_line": "indicator(\"Session VWAP Bands\", overlay=true)"
+  },
+  {
+    "id": "rsidiv",
+    "name": "RSI Divergence",
+    "short": "DIV",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"RSI Divergence\", overlay=false, max_lines_count=40)"
+  },
+  {
+    "id": "utbot",
+    "name": "UT Bot",
+    "short": "UTB",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"UT Bot\", overlay=true)"
+  },
+  {
+    "id": "ssl",
+    "name": "SSL Channel",
+    "short": "SSL",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"SSL Channel\", overlay=true)"
+  },
+  {
+    "id": "rangefilter",
+    "name": "Range Filter",
+    "short": "RF",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Range Filter\", overlay=true)"
+  },
+  {
+    "id": "trendmagic",
+    "name": "Trend Magic",
+    "short": "TM",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Trend Magic\", overlay=true)"
+  },
+  {
+    "id": "kama",
+    "name": "Kaufman Adaptive MA",
+    "short": "KAMA",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"Kaufman Adaptive MA\", overlay=true)"
+  },
+  {
+    "id": "mcginley",
+    "name": "McGinley Dynamic",
+    "short": "MCG",
+    "pane": false,
+    "tag": "Trend",
+    "title_line": "indicator(\"McGinley Dynamic\", overlay=true)"
+  },
+  {
+    "id": "nwe",
+    "name": "Nadaraya-Watson Envelope",
+    "short": "NWE",
+    "pane": false,
+    "tag": "Volatility",
+    "title_line": "indicator(\"Nadaraya-Watson Envelope\", overlay=true)"
+  },
+  {
+    "id": "qqe",
+    "name": "QQE",
+    "short": "QQE",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"QQE\", overlay=false)"
+  },
+  {
+    "id": "wae",
+    "name": "Waddah Attar Explosion",
+    "short": "WAE",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Waddah Attar Explosion\", overlay=false)"
+  },
+  {
+    "id": "stc",
+    "name": "Schaff Trend Cycle",
+    "short": "STC",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Schaff Trend Cycle\", overlay=false)"
+  },
+  {
+    "id": "fisher",
+    "name": "Fisher Transform",
+    "short": "FISH",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Fisher Transform\", overlay=false)"
+  },
+  {
+    "id": "smi",
+    "name": "Stochastic Momentum Index",
+    "short": "SMI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Stochastic Momentum Index\", overlay=false)"
+  },
+  {
+    "id": "crsi",
+    "name": "Connors RSI",
+    "short": "CRSI",
+    "pane": true,
+    "tag": "Momentum",
+    "title_line": "indicator(\"Connors RSI\", overlay=false)"
+  },
+  {
+    "id": "cvd",
+    "name": "Cumulative Volume Delta",
+    "short": "CVD",
+    "pane": true,
+    "tag": "Volume",
+    "title_line": "indicator(\"Cumulative Volume Delta\", overlay=false)"
+  },
+  {
+    "id": "elder",
+    "name": "Elder Impulse",
+    "short": "ELD",
+    "pane": false,
+    "tag": "Look",
+    "title_line": "indicator(\"Elder Impulse\", overlay=true)"
+  }
+]

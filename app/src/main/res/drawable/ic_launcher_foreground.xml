@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Tactical Corner Brackets (Neon Emerald) -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M30,38v-8h8 M70,30h8v8 M30,70v8h8 M78,70v8h-8" />
+
+    <!-- Bearish Pullback Candle (Candy Magenta) -->
+    <!-- Wick -->
+    <path
+        android:strokeColor="#FF4081"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M44,40v28" />
+    <!-- Body -->
+    <path
+        android:fillColor="#FF4081"
+        android:pathData="M41,45h6v18h-6z" />
+
+    <!-- Bullish Ignition Breakout Candle (Candy Neon Green) -->
+    <!-- Wick -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M60,28v52" />
+    <!-- Body -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M56,35h8v32h-8z" />
+
+    <!-- Tactical Target Diamond (Gold Accent) -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M60,24l4,4l-4,4l-4,-4z" />
+</vector>
