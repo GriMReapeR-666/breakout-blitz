@@ -133,6 +133,10 @@ object MonetizationManager {
         deskCredits += amount
     }
 
+    fun addCredits(amount: Int) {
+        awardCredits(amount)
+    }
+
     fun purchaseItem(itemId: String): Boolean {
         val item = STORE_CATALOG.find { it.id == itemId } ?: return false
         if (item.isPurchased) return true

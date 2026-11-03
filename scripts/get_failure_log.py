@@ -20,7 +20,22 @@ class CleanRedirectHandler(urllib.request.HTTPRedirectHandler):
         return r
 
 token = get_github_token()
-run_id = 41642644487
+# Get latest workflow run
+runs_url = "https://api.github.com/repos/GriMReapeR-666/breakout-blitz/actions/runs"
+req_runs = urllib.request.Request(
+    runs_url,
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "BreakoutBlitz-Monitor"
+    }
+)
+with urllib.request.urlopen(req_runs) as resp:
+    runs_data = json.loads(resp.read().decode("utf-8"))
+latest_run = runs_data.get("workflow_runs", [])[0]
+run_id = latest_run["id"]
+print(f"Inspecting Latest Run #{run_id} ({latest_run.get('conclusion') or latest_run.get('status')}) for commit {latest_run.get('head_commit', {}).get('id')[:7]}")
+
 url = f"https://api.github.com/repos/GriMReapeR-666/breakout-blitz/actions/runs/{run_id}/jobs"
 req = urllib.request.Request(
     url,
