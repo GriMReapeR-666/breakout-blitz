@@ -184,12 +184,35 @@ class SetupEngine(
 
         /** Continuous price evaluation at tape index `k` */
         fun priceAt(candles: List<Candle>, k: Double): Double {
+            if (candles.isEmpty()) return 100.0
             val i = min(candles.size - 1, max(0, floor(k).toInt()))
             val f = max(0.0, min(1.0, k - i))
             val p = barPath(candles[i], i)
             val n = p.size - 1
             val s = min(n - 1, floor(f * n).toInt())
             return p[s] + (p[s + 1] - p[s]) * (f * n - s)
+        }
+
+        /**
+         * Real-time forming candle at fractional tape index `k`.
+         * Open is fixed at candle open, Close is live price, High & Low expand
+         * along the 32 Brownian bridge steps traversed so far.
+         */
+        fun formingAt(candles: List<Candle>, k: Double): Candle {
+            if (candles.isEmpty()) return Candle(100.0, 100.0, 100.0, 100.0, 100.0)
+            val i = min(candles.size - 1, max(0, floor(k).toInt()))
+            val f = max(0.0, min(1.0, k - i))
+            val p = barPath(candles[i], i)
+            val n = p.size - 1
+            val s = min(n - 1, floor(f * n).toInt())
+            val cl = p[s] + (p[s + 1] - p[s]) * (f * n - s)
+            var h = max(p[0], cl)
+            var l = min(p[0], cl)
+            for (j in 1..s) {
+                if (p[j] > h) h = p[j]
+                if (p[j] < l) l = p[j]
+            }
+            return Candle(p[0], h, l, cl, candles[i].v)
         }
 
         /** Position P&L in dollars */
@@ -230,6 +253,109 @@ class SetupEngine(
                 k = end
             }
             return null
+        }
+    }
+
+    /**
+     * Exact 1:1 Camera Tracking Math from Setup Rush (`_t` and `Ot`).
+     * Supports sub-pixel continuous horizontal auto-scrolling and exponential vertical price following.
+     */
+    class ChartCamera(
+        var n: Double = 28.0 // visible candle count
+    ) {
+        var right: Double = 0.0 // fractional candle index at right margin
+        var lo: Double = 0.0    // lowest price in view
+        var hi: Double = 1.0    // highest price in view
+        var tLo: Double = 0.0   // target low price
+        var tHi: Double = 1.0   // target high price
+        var follow: Boolean = true
+        var showP: Double = 0.0 // exponentially smoothed live price
+        var init: Boolean = false
+
+        fun update(k: Double, candles: List<Candle>, dt: Double, posEntry: Double? = null) {
+            if (candles.isEmpty()) return
+            val dtClamped = min(0.05, max(0.001, dt))
+
+            // 1. Horizontal auto-scroll follow
+            val targetRight = k + 1.0 + n * 0.18
+            if (!init) {
+                right = targetRight
+                init = true
+            } else if (follow) {
+                right += (targetRight - right) * (1.0 - exp(-dtClamped * 8.0))
+            }
+            val x0 = right - n
+
+            // 2. Vertical price window bounds calculation
+            val cIdx = min(candles.size - 1, max(0, floor(k).toInt()))
+            val lIdx = max(0, floor(x0).toInt())
+            val uIdx = min(cIdx, ceil(right).toInt())
+
+            var minP = Double.MAX_VALUE
+            var maxP = -Double.MAX_VALUE
+            for (i in lIdx..uIdx) {
+                val bar = if (i == cIdx) formingAt(candles, k) else candles[i]
+                if (bar.l < minP) minP = bar.l
+                if (bar.h > maxP) maxP = bar.h
+            }
+            if (minP >= maxP || minP == Double.MAX_VALUE) {
+                val bar = formingAt(candles, k)
+                minP = bar.l
+                maxP = bar.h
+            }
+            if (posEntry != null && follow) {
+                minP = min(minP, posEntry)
+                maxP = max(maxP, posEntry)
+            }
+
+            // Price headroom and floor padding (14% padding)
+            val span = max(0.01, maxP - minP)
+            val pad = span * 0.14
+            val targetMinP = minP - pad
+            val targetMaxP = maxP + pad
+
+            if (tLo == 0.0 && tHi == 1.0) {
+                tLo = targetMinP
+                tHi = targetMaxP
+                lo = targetMinP
+                hi = targetMaxP
+            } else {
+                val curSpan = tHi - tLo
+                val expand = targetMinP < tLo || targetMaxP > tHi
+                if (expand) {
+                    tLo = targetMinP - (if (targetMinP < tLo) span * 0.18 else 0.0)
+                    tHi = targetMaxP + (if (targetMaxP > tHi) span * 0.18 else 0.0)
+                } else if (curSpan > span * 1.35) {
+                    tLo = targetMinP
+                    tHi = targetMaxP
+                }
+                val smoothFactor = 1.0 - exp(-dtClamped * 5.0)
+                lo += (tLo - lo) * smoothFactor
+                hi += (tHi - hi) * smoothFactor
+            }
+
+            // 3. Smooth active price tracking (Ot function in Setup Rush)
+            val curPrice = priceAt(candles, k)
+            if (showP <= 0.0 || abs(curPrice - showP) > abs(curPrice) * 0.1) {
+                showP = curPrice
+            } else {
+                showP += (curPrice - showP) * (1.0 - exp(-dtClamped * 11.0))
+            }
+        }
+
+        fun barSpacing(width: Float): Float = width / n.toFloat()
+
+        fun barWidth(width: Float): Float = barSpacing(width) * 0.72f
+
+        fun xOf(candleIndex: Double, width: Float): Float {
+            val spacing = barSpacing(width)
+            val x0 = right - n
+            return ((candleIndex - x0).toFloat() + 0.5f) * spacing
+        }
+
+        fun yOf(price: Double, height: Float): Float {
+            val range = max(0.0001, hi - lo)
+            return (height - ((price - lo) / range * height)).toFloat()
         }
     }
 

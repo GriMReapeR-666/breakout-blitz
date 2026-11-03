@@ -10,14 +10,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.setuprush.candy.engine.Candle
@@ -27,51 +33,90 @@ import com.setuprush.candy.engine.SetupExecutionTimingEngine
 import com.setuprush.candy.engine.SetupRecord
 import com.setuprush.candy.theme.GameTheme
 import com.setuprush.candy.theme.ThemeManager
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.min
+import kotlin.math.*
 
 /**
- * Pure native Jetpack Compose candlestick chart renderer.
- * Features 120 Hz ultra-fluid hardware accelerated drawing, dynamic viewport scaling,
- * intrabar tick pulse, touch-hold long / drag-down short trading gestures,
- * and live SMC (BOS/CHoCH, FVG), Supertrend, and Pattern Lock visual signals.
+ * Pure native Jetpack Compose candlestick chart engine.
+ * Delivers 1:1 parity with the authentic Setup Rush canvas physics:
+ * - Exponential camera tracking (`_t` and `Ot`) with continuous sub-pixel horizontal scrolling
+ * - Live micro-tick forming candle with intrabar Brownian bridge progression
+ * - Dual-direction tactile trading gestures (Hold Long, Slide Down to Short, Release to Cash Out)
+ * - Corner bracket reticles on pattern-locked setups with +2R target & -1R stop rays
+ * - Corridor P&L fill, trade trajectory curve, and floating dual-badge position pill
+ * - Intrabar circular touch progress ring on finger press with direction cues
  */
 @Composable
 fun ChartCanvas(
     candles: List<Candle>,
     tapePosition: Double,
     theme: GameTheme = ThemeManager.currentTheme.value,
+    camera: SetupEngine.ChartCamera = remember { SetupEngine.ChartCamera() },
     activeSetup: SetupRecord? = null,
     supertrendEnabled: Boolean = true,
     structureEnabled: Boolean = true,
     fvgEnabled: Boolean = true,
     emaCrossEnabled: Boolean = true,
     patternLockEnabled: Boolean = true,
+    isExternalHolding: Boolean = false,
+    externalDirection: Int = 1,
+    externalEntryPrice: Double = 100.0,
+    externalLivePnl: Double = 0.0,
+    currentLeverage: Double = 10.0,
     onLongEntry: () -> Unit = {},
     onShortEntry: () -> Unit = {},
     onCashOut: (Double) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isHolding by remember { mutableStateOf(false) }
-    var activeDirection by remember { mutableStateOf(0) } // +1 = Long, -1 = Short
-    var entryPrice by remember { mutableStateOf(100.0) }
-    var livePnl by remember { mutableStateOf(0.0) }
+    var activeDirection by remember { mutableIntStateOf(1) } // +1 = Long, -1 = Short
+    var entryPrice by remember { mutableDoubleStateOf(100.0) }
+    var entryTapeIndex by remember { mutableDoubleStateOf(10.0) }
+    var livePnl by remember { mutableDoubleStateOf(0.0) }
+
+    // Touch ring tracking state
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
+    var touchStartPos by remember { mutableStateOf<Offset?>(null) }
+    var touchDurationMs by remember { mutableLongStateOf(0L) }
+
+    // Screen effects state
+    var flashAlpha by remember { mutableFloatStateOf(0f) }
+    var flashColor by remember { mutableStateOf(Color.White) }
 
     val currentPrice = remember(candles, tapePosition) {
         if (candles.isEmpty()) 100.0 else SetupEngine.priceAt(candles, tapePosition)
     }
 
-    LaunchedEffect(currentPrice, isHolding, activeDirection) {
-        if (isHolding && activeDirection != 0) {
-            livePnl = SetupEngine.ridePnl(activeDirection, entryPrice, currentPrice, notional = 1000.0)
+    // Sync external holding state if driven by bottom action bar
+    LaunchedEffect(isExternalHolding, externalDirection, externalEntryPrice, externalLivePnl) {
+        if (isExternalHolding && !isHolding) {
+            isHolding = true
+            activeDirection = externalDirection
+            entryPrice = externalEntryPrice
+            entryTapeIndex = tapePosition
+        } else if (!isExternalHolding && isHolding && touchPos == null) {
+            isHolding = false
+        }
+    }
+
+    // Continuously compute floating P&L
+    LaunchedEffect(currentPrice, isHolding, activeDirection, entryPrice, currentLeverage) {
+        if (isHolding) {
+            val notional = 1000.0 * (currentLeverage / 10.0)
+            livePnl = SetupEngine.ridePnl(activeDirection, entryPrice, currentPrice, notional = notional)
         } else {
             livePnl = 0.0
         }
     }
 
-    // Precalculate signals
+    // Fade screen flash effect
+    LaunchedEffect(flashAlpha) {
+        if (flashAlpha > 0f) {
+            kotlinx.coroutines.delay(16)
+            flashAlpha = max(0f, flashAlpha - 0.08f)
+        }
+    }
+
+    // Precalculate technical indicators
     val supertrend = remember(candles.size, supertrendEnabled) {
         if (supertrendEnabled) IndicatorEngine.computeSupertrend(candles) else emptyList()
     }
@@ -85,392 +130,556 @@ fun ChartCanvas(
         if (emaCrossEnabled) IndicatorEngine.computeEmaCross(candles) else emptyList()
     }
 
+    val textMeasurer = rememberTextMeasurer()
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(theme.bg)
-            .pointerInput(Unit) {
+            .pointerInput(candles, tapePosition) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        val startP = SetupEngine.priceAt(candles, tapePosition)
                         isHolding = true
-                        activeDirection = 1 // Default to Long
-                        entryPrice = currentPrice
+                        activeDirection = 1 // Default to Long on initial touch
+                        entryPrice = startP
+                        entryTapeIndex = tapePosition
+                        touchPos = offset
+                        touchStartPos = offset
+                        touchDurationMs = System.currentTimeMillis()
                         onLongEntry()
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        // Dragging down shifts into Short
-                        if (dragAmount.y > 15f && activeDirection != -1) {
+                        touchPos = change.position
+                        val start = touchStartPos ?: change.position
+                        val dy = change.position.y - start.y
+
+                        // Exact 26px threshold from Setup Rush `at(e, t)` function
+                        if (dy > 26f && activeDirection != -1) {
                             activeDirection = -1
-                            entryPrice = currentPrice
+                            entryPrice = SetupEngine.priceAt(candles, tapePosition)
+                            entryTapeIndex = tapePosition
                             onShortEntry()
-                        } else if (dragAmount.y < -15f && activeDirection != 1) {
+                        } else if (dy < -26f && activeDirection != 1) {
                             activeDirection = 1
-                            entryPrice = currentPrice
+                            entryPrice = SetupEngine.priceAt(candles, tapePosition)
+                            entryTapeIndex = tapePosition
                             onLongEntry()
                         }
                     },
                     onDragEnd = {
+                        val finalPnl = livePnl
                         if (isHolding) {
-                            onCashOut(livePnl)
+                            flashColor = if (finalPnl >= 0) theme.bull else theme.bear
+                            flashAlpha = 0.28f
+                            onCashOut(finalPnl)
                         }
                         isHolding = false
-                        activeDirection = 0
+                        touchPos = null
+                        touchStartPos = null
                     },
                     onDragCancel = {
                         isHolding = false
-                        activeDirection = 0
+                        touchPos = null
+                        touchStartPos = null
                     }
                 )
             }
     ) {
-        // Compose Native Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (candles.isEmpty()) return@Canvas
 
             val w = size.width
             val h = size.height
 
-            // Visible window of candles (e.g. 24 bars)
-            val windowBars = 24
-            val endIndex = min(candles.size, max(windowBars, tapePosition.toInt() + 4))
-            val startIndex = max(0, endIndex - windowBars)
-            val visible = candles.subList(startIndex, endIndex)
+            // 1. Draw horizontal price gridlines & right-side price scale
+            val gridCount = 5
+            val priceSpan = max(0.01, camera.hi - camera.lo)
+            val priceStep = priceSpan / gridCount
 
-            var minP = Double.MAX_VALUE
-            var maxP = Double.MIN_VALUE
-            for (c in visible) {
-                if (c.l < minP) minP = c.l
-                if (c.h > maxP) maxP = c.h
+            for (g in 0..gridCount) {
+                val gridPrice = camera.lo + g * priceStep
+                val gy = camera.yOf(gridPrice, h)
+                if (gy in 0f..h) {
+                    drawLine(
+                        color = theme.grid.copy(alpha = 0.25f),
+                        start = Offset(0f, gy),
+                        end = Offset(w, gy),
+                        strokeWidth = 1f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 8f))
+                    )
+                    // Price label on right margin
+                    val priceLabel = String.format("%.2f", gridPrice)
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = priceLabel,
+                        topLeft = Offset(w - 62.dp.toPx(), gy - 12.dp.toPx()),
+                        style = TextStyle(
+                            color = theme.muted.copy(alpha = 0.7f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                }
             }
-            val pad = (maxP - minP) * 0.15
-            minP -= pad
-            maxP += pad
-            val pRange = max(0.01, maxP - minP)
 
-            fun yOf(p: Double): Float = (h - ((p - minP) / pRange * h)).toFloat()
+            // 2. Draw vertical time gridlines
+            val spacing = camera.barSpacing(w)
+            val firstBar = max(0, floor(camera.right - camera.n).toInt())
+            val lastBar = min(candles.size - 1, ceil(camera.right).toInt())
 
-            val barSpacing = w / windowBars
-            val barWidth = barSpacing * 0.65f
-
-            // 1. Draw grid lines
-            for (g in 1..4) {
-                val gy = h * (g / 5f)
-                drawLine(
-                    color = theme.grid,
-                    start = Offset(0f, gy),
-                    end = Offset(w, gy),
-                    strokeWidth = 1f
-                )
+            for (i in firstBar..lastBar) {
+                if (i % 6 == 0) {
+                    val gx = camera.xOf(i.toDouble(), w)
+                    drawLine(
+                        color = theme.grid.copy(alpha = 0.15f),
+                        start = Offset(gx, 0f),
+                        end = Offset(gx, h),
+                        strokeWidth = 1f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 8f))
+                    )
+                }
             }
 
-            // 2. Draw SMC Fair Value Gaps (FVG)
+            // 3. Draw SMC Fair Value Gaps (corridors with neon glow borders)
             if (fvgEnabled) {
                 for (fvg in fvgs) {
-                    if (fvg.startIdx in startIndex until endIndex) {
-                        val localIdx = fvg.startIdx - startIndex
-                        val x = localIdx * barSpacing
-                        val yTop = yOf(fvg.top)
-                        val yBot = yOf(fvg.bottom)
-                        val fvgColor = if (fvg.isBull) theme.bull.copy(alpha = 0.12f) else theme.bear.copy(alpha = 0.12f)
+                    if (fvg.startIdx >= firstBar - 4 && fvg.startIdx <= lastBar + 2) {
+                        val xLeft = camera.xOf(fvg.startIdx.toDouble(), w)
+                        val xRight = camera.xOf((fvg.startIdx + 3).toDouble(), w)
+                        val yTop = camera.yOf(fvg.top, h)
+                        val yBot = camera.yOf(fvg.bottom, h)
+                        val fvgCol = if (fvg.isBull) theme.bull else theme.bear
+
+                        // Shaded corridor
                         drawRect(
-                            color = fvgColor,
-                            topLeft = Offset(x, min(yTop, yBot)),
-                            size = Size(barSpacing * 3f, abs(yBot - yTop))
+                            color = fvgCol.copy(alpha = 0.10f),
+                            topLeft = Offset(xLeft, min(yTop, yBot)),
+                            size = Size(max(10f, xRight - xLeft), abs(yBot - yTop))
+                        )
+                        // Corridor dashed boundary lines
+                        drawLine(
+                            color = fvgCol.copy(alpha = 0.45f),
+                            start = Offset(xLeft, yTop),
+                            end = Offset(xRight, yTop),
+                            strokeWidth = 1.2f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+                        )
+                        drawLine(
+                            color = fvgCol.copy(alpha = 0.45f),
+                            start = Offset(xLeft, yBot),
+                            end = Offset(xRight, yBot),
+                            strokeWidth = 1.2f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
                         )
                     }
                 }
             }
 
-            // 3. Draw Candlesticks using exact theme colors
-            visible.forEachIndexed { i, c ->
-                val x = i * barSpacing + barSpacing * 0.5f
-                val isUp = c.c >= c.o
-                val bodyColor = if (isUp) theme.up else theme.down
-                val wickColor = if (isUp) theme.wickUp else theme.wickDown
+            // 4. Draw Market Structure (BOS / CHoCH)
+            if (structureEnabled) {
+                for (sl in structureLines) {
+                    if (sl.endIdx >= firstBar && sl.startIdx <= lastBar) {
+                        val x1 = max(0f, camera.xOf(sl.startIdx.toDouble(), w))
+                        val x2 = min(w, camera.xOf(sl.endIdx.toDouble(), w))
+                        val y = camera.yOf(sl.level, h)
+                        val isChoch = sl.label == "CHoCH"
+                        val slCol = if (isChoch) theme.bear else theme.bull
 
-                // High-Low Wick
-                drawLine(
-                    color = wickColor,
-                    start = Offset(x, yOf(c.h)),
-                    end = Offset(x, yOf(c.l)),
-                    strokeWidth = 2.5f,
-                    cap = StrokeCap.Round
-                )
-
-                // Open-Close Body
-                val topY = yOf(max(c.o, c.c))
-                val botY = yOf(min(c.o, c.c))
-                val bodyH = max(3f, botY - topY)
-
-                drawRect(
-                    color = bodyColor,
-                    topLeft = Offset(x - barWidth / 2f, topY),
-                    size = Size(barWidth, bodyH)
-                )
-
-                // Outline stroke if specified
-                if (theme.outline != Color.Transparent && theme.outline != bodyColor) {
-                    drawRect(
-                        color = theme.outline,
-                        topLeft = Offset(x - barWidth / 2f, topY),
-                        size = Size(barWidth, bodyH),
-                        style = Stroke(width = 1.2f)
-                    )
-                }
-            }
-
-            // 4. Draw EMA 9 / 21 Cross Lines & Signals
-            if (emaCrossEnabled && emaPoints.size == candles.size) {
-                var prevFastPt: Offset? = null
-                var prevSlowPt: Offset? = null
-                for (i in 0 until visible.size) {
-                    val globalIdx = startIndex + i
-                    val ep = emaPoints[globalIdx]
-                    val x = i * barSpacing + barSpacing * 0.5f
-                    val yFast = yOf(ep.fast)
-                    val ySlow = yOf(ep.slow)
-                    val fastPt = Offset(x, yFast)
-                    val slowPt = Offset(x, ySlow)
-
-                    if (prevFastPt != null && prevSlowPt != null) {
-                        drawLine(color = theme.bull.copy(alpha = 0.5f), start = prevFastPt, end = fastPt, strokeWidth = 1.6f)
-                        drawLine(color = theme.bear.copy(alpha = 0.5f), start = prevSlowPt, end = slowPt, strokeWidth = 1.6f)
-                    }
-                    prevFastPt = fastPt
-                    prevSlowPt = slowPt
-
-                    if (ep.signal == "CROSS_UP") {
-                        drawCircle(color = theme.bull, radius = 7f, center = Offset(x, yFast))
-                    } else if (ep.signal == "CROSS_DOWN") {
-                        drawCircle(color = theme.bear, radius = 7f, center = Offset(x, ySlow))
-                    }
-                }
-            }
-
-            // 5. Draw Supertrend Line & BUY/SELL signals
-            if (supertrendEnabled && supertrend.size == candles.size) {
-                var prevPoint: Offset? = null
-                for (i in 0 until visible.size) {
-                    val globalIdx = startIndex + i
-                    val st = supertrend[globalIdx]
-                    val x = i * barSpacing + barSpacing * 0.5f
-                    val y = yOf(st.value)
-                    val pt = Offset(x, y)
-
-                    if (prevPoint != null) {
                         drawLine(
-                            color = if (st.isBull) theme.bull else theme.bear,
-                            start = prevPoint,
+                            color = slCol.copy(alpha = 0.75f),
+                            start = Offset(x1, y),
+                            end = Offset(x2, y),
+                            strokeWidth = 1.8f,
+                            pathEffect = if (isChoch) PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null
+                        )
+                        // Structure pill badge
+                        drawText(
+                            textMeasurer = textMeasurer,
+                            text = sl.label,
+                            topLeft = Offset(x1 + 6f, y - 14f),
+                            style = TextStyle(
+                                color = slCol,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        )
+                    }
+                }
+            }
+
+            // 5. Draw Supertrend & EMA Cross Lines
+            if (supertrendEnabled && supertrend.size == candles.size) {
+                var prevPt: Offset? = null
+                for (i in max(0, firstBar)..min(candles.size - 1, lastBar)) {
+                    val st = supertrend[i]
+                    val pt = Offset(camera.xOf(i.toDouble(), w), camera.yOf(st.value, h))
+                    if (prevPt != null) {
+                        drawLine(
+                            color = if (st.isBull) theme.bull.copy(alpha = 0.7f) else theme.bear.copy(alpha = 0.7f),
+                            start = prevPt,
                             end = pt,
                             strokeWidth = 2.2f,
                             cap = StrokeCap.Round
                         )
                     }
-                    prevPoint = pt
-
-                    // BUY / SELL marker tags
-                    if (st.signal == "BUY") {
-                        drawCircle(color = theme.bull, radius = 6f, center = Offset(x, yOf(visible[i].l) + 12f))
-                    } else if (st.signal == "SELL") {
-                        drawCircle(color = theme.bear, radius = 6f, center = Offset(x, yOf(visible[i].h) - 12f))
-                    }
+                    prevPt = pt
                 }
             }
 
-            // 6. Draw Market Structure (BOS / CHoCH) lines
-            if (structureEnabled) {
-                for (sl in structureLines) {
-                    if (sl.endIdx >= startIndex && sl.startIdx <= endIndex) {
-                        val x1 = max(0f, (sl.startIdx - startIndex) * barSpacing)
-                        val x2 = min(w, (sl.endIdx - startIndex) * barSpacing)
-                        val y = yOf(sl.level)
-                        drawLine(
-                            color = if (sl.label == "CHoCH") theme.bear.copy(alpha = 0.8f) else theme.bull.copy(alpha = 0.8f),
-                            start = Offset(x1, y),
-                            end = Offset(x2, y),
-                            strokeWidth = 1.8f,
-                            pathEffect = if (sl.label == "CHoCH") PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null
-                        )
-                    }
+            // 6. Draw Candlesticks (Historical Bars)
+            val currentTapeIdx = floor(tapePosition).toInt()
+            val bw = camera.barWidth(w)
+
+            for (i in firstBar until min(currentTapeIdx, candles.size)) {
+                val c = candles[i]
+                val cx = camera.xOf(i.toDouble(), w)
+                val isUp = c.c >= c.o
+                val wickColor = if (isUp) theme.wickUp else theme.wickDown
+                val bodyColor = if (isUp) theme.up else theme.down
+
+                val topY = camera.yOf(max(c.o, c.c), h)
+                val botY = camera.yOf(min(c.o, c.c), h)
+                val bodyH = max(2.5f, botY - topY)
+
+                // High-Low Wick
+                drawLine(
+                    color = wickColor,
+                    start = Offset(cx, camera.yOf(c.h, h)),
+                    end = Offset(cx, camera.yOf(c.l, h)),
+                    strokeWidth = 2.2f,
+                    cap = StrokeCap.Round
+                )
+
+                // Candle Body
+                drawRect(
+                    color = bodyColor,
+                    topLeft = Offset(cx - bw / 2f, topY),
+                    size = Size(bw, bodyH)
+                )
+
+                // Theme Outline stroke
+                if (theme.outline != Color.Transparent && theme.outline != bodyColor) {
+                    drawRect(
+                        color = theme.outline,
+                        topLeft = Offset(cx - bw / 2f, topY),
+                        size = Size(bw, bodyH),
+                        style = Stroke(width = 1.0f)
+                    )
                 }
             }
 
-            // 6. Draw Active Trade Indicators
+            // 7. Draw Live Active Forming Candle (at fractional tapePosition)
+            if (currentTapeIdx in candles.indices) {
+                val forming = SetupEngine.formingAt(candles, tapePosition)
+                val activeCx = camera.xOf(currentTapeIdx.toDouble(), w)
+                val isUp = forming.c >= forming.o
+                val formingWickCol = if (isUp) theme.wickUp else theme.wickDown
+                val formingBodyCol = if (isUp) theme.up else theme.down
+
+                val fTopY = camera.yOf(max(forming.o, forming.c), h)
+                val fBotY = camera.yOf(min(forming.o, forming.c), h)
+                val fBodyH = max(2.5f, fBotY - fTopY)
+                val currPriceY = camera.yOf(forming.c, h)
+
+                // High-Low Wick (morphing live along Brownian bridge)
+                drawLine(
+                    color = formingWickCol,
+                    start = Offset(activeCx, camera.yOf(forming.h, h)),
+                    end = Offset(activeCx, camera.yOf(forming.l, h)),
+                    strokeWidth = 2.5f,
+                    cap = StrokeCap.Round
+                )
+
+                // Forming Body
+                drawRect(
+                    color = formingBodyCol,
+                    topLeft = Offset(activeCx - bw / 2f, fTopY),
+                    size = Size(bw, fBodyH)
+                )
+
+                // Live Intrabar Tick Line across Candle Body (Setup Rush signature tick)
+                drawRect(
+                    color = if (isUp) theme.bull else theme.bear,
+                    topLeft = Offset(activeCx - bw / 2f - 2f, currPriceY - 1f),
+                    size = Size(bw + 4f, 2.5f)
+                )
+
+                // Horizontal Live Price Dotted Ray extending to right margin
+                drawLine(
+                    color = if (isUp) theme.bull.copy(alpha = 0.85f) else theme.bear.copy(alpha = 0.85f),
+                    start = Offset(activeCx + bw / 2f + 4f, currPriceY),
+                    end = Offset(w, currPriceY),
+                    strokeWidth = 1.4f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+                )
+
+                // Active Price Badge on Right Axis
+                val priceText = String.format("%.2f", forming.c)
+                val pillW = 60.dp.toPx()
+                val pillH = 20.dp.toPx()
+                val pillX = w - pillW - 2.dp.toPx()
+                val pillY = currPriceY - pillH / 2f
+
+                drawRoundRect(
+                    color = if (isUp) theme.bull else theme.bear,
+                    topLeft = Offset(pillX, pillY),
+                    size = Size(pillW, pillH),
+                    cornerRadius = CornerRadius(4.dp.toPx())
+                )
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = priceText,
+                    topLeft = Offset(pillX + 4.dp.toPx(), pillY + 3.dp.toPx()),
+                    style = TextStyle(
+                        color = if (theme.isLight) Color.White else Color.Black,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+
+            // 8. Pattern Locked Setup Reticles & Target/Stop Rays
+            if (patternLockEnabled && activeSetup != null) {
+                val sAt = activeSetup.at
+                val startIdx = max(0, sAt - 3)
+                val sMinX = camera.xOf(startIdx.toDouble(), w) - bw * 0.8f
+                val sMaxX = camera.xOf(sAt.toDouble(), w) + bw * 0.8f
+
+                var setupHigh = -Double.MAX_VALUE
+                var setupLow = Double.MAX_VALUE
+                for (j in startIdx..min(sAt, candles.size - 1)) {
+                    if (candles[j].h > setupHigh) setupHigh = candles[j].h
+                    if (candles[j].l < setupLow) setupLow = candles[j].l
+                }
+
+                val sTopY = camera.yOf(setupHigh, h) - 8f
+                val sBotY = camera.yOf(setupLow, h) + 8f
+                val setupColor = if (activeSetup.dir == 1) theme.bull else theme.bear
+
+                // Corner Reticles around setup candles
+                val bracketSize = 14f
+                val reticleStroke = 2.4f
+
+                // Top-Left Reticle
+                drawLine(setupColor, Offset(sMinX, sTopY + bracketSize), Offset(sMinX, sTopY), reticleStroke)
+                drawLine(setupColor, Offset(sMinX, sTopY), Offset(sMinX + bracketSize, sTopY), reticleStroke)
+                // Top-Right Reticle
+                drawLine(setupColor, Offset(sMaxX - bracketSize, sTopY), Offset(sMaxX, sTopY), reticleStroke)
+                drawLine(setupColor, Offset(sMaxX, sTopY), Offset(sMaxX, sTopY + bracketSize), reticleStroke)
+                // Bottom-Left Reticle
+                drawLine(setupColor, Offset(sMinX, sBotY - bracketSize), Offset(sMinX, sBotY), reticleStroke)
+                drawLine(setupColor, Offset(sMinX, sBotY), Offset(sMinX + bracketSize, sBotY), reticleStroke)
+                // Bottom-Right Reticle
+                drawLine(setupColor, Offset(sMaxX - bracketSize, sBotY), Offset(sMaxX, sBotY), reticleStroke)
+                drawLine(setupColor, Offset(sMaxX, sBotY), Offset(sMaxX, sBotY - bracketSize), reticleStroke)
+
+                // Forward Projected Target (+2R) and Stop (-1R) rays
+                val targetPrice = activeSetup.entry + activeSetup.dir * 2 * activeSetup.risk
+                val stopPrice = activeSetup.stop
+                val targetY = camera.yOf(targetPrice, h)
+                val stopY = camera.yOf(stopPrice, h)
+
+                // Target Ray (Green)
+                drawLine(
+                    color = theme.bull.copy(alpha = 0.85f),
+                    start = Offset(sMaxX, targetY),
+                    end = Offset(w - 65.dp.toPx(), targetY),
+                    strokeWidth = 1.6f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                )
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = "TARGET +2R",
+                    topLeft = Offset(w - 60.dp.toPx(), targetY - 12.dp.toPx()),
+                    style = TextStyle(
+                        color = theme.bull,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
+                // Stop Loss Ray (Red)
+                drawLine(
+                    color = theme.bear.copy(alpha = 0.85f),
+                    start = Offset(sMaxX, stopY),
+                    end = Offset(w - 65.dp.toPx(), stopY),
+                    strokeWidth = 1.6f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                )
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = "STOP -1R",
+                    topLeft = Offset(w - 60.dp.toPx(), stopY - 12.dp.toPx()),
+                    style = TextStyle(
+                        color = theme.bear,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+
+            // 9. In-Position Active Trade Overlays (Corridor, Trajectory, Floating Pill)
             if (isHolding) {
-                val entryY = yOf(entryPrice)
+                val entryX = camera.xOf(entryTapeIndex, w)
+                val currentX = camera.xOf(tapePosition, w)
+                val entryY = camera.yOf(entryPrice, h)
+                val currY = camera.yOf(currentPrice, h)
                 val tradeColor = if (activeDirection == 1) theme.bull else theme.bear
 
-                // Entry price line
+                // Dotted horizontal entry ray from entry to right margin
                 drawLine(
-                    color = tradeColor.copy(alpha = 0.6f),
-                    start = Offset(0f, entryY),
+                    color = Color.White.copy(alpha = 0.5f),
+                    start = Offset(entryX, entryY),
                     end = Offset(w, entryY),
-                    strokeWidth = 2f
+                    strokeWidth = 1.6f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
                 )
 
-                // Current price tick pulse
-                val currY = yOf(currentPrice)
-                drawCircle(
-                    color = if (livePnl >= 0) theme.bull else theme.bear,
-                    radius = 8f,
-                    center = Offset(w - 24f, currY)
-                )
-            }
-        }
+                // Corridor gradient fill between Entry and Current Price
+                val topCorridorY = min(entryY, currY)
+                val botCorridorY = max(entryY, currY)
+                val corridorH = max(4f, botCorridorY - topCorridorY)
 
-        // Live HUD Overlay
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "SETUP RUSH · ${theme.name.uppercase()}",
-                        color = theme.bull,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = String.format("$%.2f", currentPrice),
-                        color = theme.text,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                if (isHolding) {
-                    val pnlColor = if (livePnl >= 0) theme.bull else theme.bear
-                    val prefix = if (livePnl >= 0) "+$" else "-$"
-                    val dirText = if (activeDirection == 1) "LONG" else "SHORT"
-
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = dirText,
-                            color = if (activeDirection == 1) theme.bull else theme.bear,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "$prefix${String.format("%.2f", abs(livePnl))}",
-                            color = pnlColor,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "HOLD TO RIDE",
-                        color = theme.muted,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            // Real-Time Pattern Lock Banner (Candle Vision parity)
-            if (patternLockEnabled) {
-                activeSetup?.let { setup ->
-                    Surface(
-                        color = theme.bg.copy(alpha = 0.92f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (setup.dir == 1) theme.bull.copy(alpha = 0.6f) else theme.bear.copy(alpha = 0.6f)),
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "⚡ PATTERN LOCKED:",
-                                color = theme.muted,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = setup.name.uppercase(),
-                                color = theme.text,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Text(
-                                text = if (setup.dir == 1) "BULLISH" else "BEARISH",
-                                color = if (setup.dir == 1) theme.bull else theme.bear,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                text = "${(setup.winRate * 100).toInt()}% WIN",
-                                color = theme.muted,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Real-Time Trade Execution Timing & Missed Setup Feedback
-            SetupExecutionTimingEngine.currentFeedback?.let { fb ->
-                Surface(
-                    color = theme.bg.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.5.dp,
-                        when (fb.grade) {
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.PERFECT_ENTRY -> Color(0xFF00E676)
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.GOOD_ENTRY -> theme.bull
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.LATE_ENTRY -> Color(0xFFFFB300)
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.FOMO_EARLY -> theme.bear
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.MISSED_SETUP -> Color(0xFFFF9100)
-                            SetupExecutionTimingEngine.ExecutionTimingGrade.DISCIPLINED_PASS -> Color(0xFF00B0FF)
-                        }
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            tradeColor.copy(alpha = if (livePnl >= 0) 0.18f else 0.14f),
+                            tradeColor.copy(alpha = 0.03f)
+                        ),
+                        startY = topCorridorY,
+                        endY = botCorridorY
                     ),
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(horizontal = 16.dp).padding(top = if (patternLockEnabled && activeSetup != null) 42.dp else 0.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "${fb.grade.badge} ${fb.grade.title}",
-                                color = when (fb.grade) {
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.PERFECT_ENTRY -> Color(0xFF00E676)
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.GOOD_ENTRY -> theme.bull
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.LATE_ENTRY -> Color(0xFFFFB300)
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.FOMO_EARLY -> theme.bear
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.MISSED_SETUP -> Color(0xFFFF9100)
-                                    SetupExecutionTimingEngine.ExecutionTimingGrade.DISCIPLINED_PASS -> Color(0xFF00B0FF)
-                                },
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Text(
-                                text = fb.message,
-                                color = theme.text,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = "💡 Leak Tip: ${fb.leakTip}",
-                            color = theme.muted,
-                            fontSize = 10.sp
-                        )
-                    }
-                }
+                    topLeft = Offset(entryX, topCorridorY),
+                    size = Size(max(10f, currentX - entryX), corridorH)
+                )
+
+                // Glowing Entry Point Dot
+                drawCircle(color = tradeColor, radius = 6f, center = Offset(entryX, entryY))
+                drawCircle(color = theme.bg, radius = 2.5f, center = Offset(entryX, entryY))
+
+                // Floating Position Pill Capsule (Exact Setup Rush lr/ur implementation)
+                // Left side: LONG/SHORT + Leverage. Right side: Live P&L.
+                val pillTagText = if (activeDirection == 1) "LONG ${currentLeverage.toInt()}×" else "SHORT ${currentLeverage.toInt()}×"
+                val pnlSign = if (livePnl >= 0) "+$" else "-$"
+                val pillPnlText = "$pnlSign${String.format("%.2f", abs(livePnl))}"
+
+                val tagWidth = 64.dp.toPx()
+                val pnlWidth = 74.dp.toPx()
+                val totalCapsuleW = tagWidth + pnlWidth
+                val capsuleH = 26.dp.toPx()
+
+                // Smoothly position capsule right next to tape tick or docked on right
+                val capsuleX = min(w - totalCapsuleW - 8.dp.toPx(), max(8.dp.toPx(), currentX + 16.dp.toPx()))
+                val capsuleY = min(h - 90.dp.toPx(), max(48.dp.toPx(), currY - capsuleH / 2f))
+
+                // Capsule Background Outer Container
+                drawRoundRect(
+                    color = tradeColor,
+                    topLeft = Offset(capsuleX, capsuleY),
+                    size = Size(totalCapsuleW, capsuleH),
+                    cornerRadius = CornerRadius(6.dp.toPx())
+                )
+
+                // Left Inner Badge (Tag + Leverage)
+                val tagColor = if (theme.isLight) Color(0xFF191A17) else Color(0xFF07090F)
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = pillTagText,
+                    topLeft = Offset(capsuleX + 6.dp.toPx(), capsuleY + 6.dp.toPx()),
+                    style = TextStyle(
+                        color = tagColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
+                // Right Inner Badge (P&L Value in high-contrast card)
+                val rightBoxX = capsuleX + tagWidth
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.88f),
+                    topLeft = Offset(rightBoxX, capsuleY + 2.dp.toPx()),
+                    size = Size(pnlWidth - 2.dp.toPx(), capsuleH - 4.dp.toPx()),
+                    cornerRadius = CornerRadius(4.dp.toPx())
+                )
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = pillPnlText,
+                    topLeft = Offset(rightBoxX + 6.dp.toPx(), capsuleY + 5.dp.toPx()),
+                    style = TextStyle(
+                        color = if (livePnl >= 0) theme.bull else theme.bear,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+
+            // 10. Circular Touch Progress Ring on Finger Press (vr function parity)
+            touchPos?.let { pos ->
+                val ringRadius = 34.dp.toPx()
+                val ringColor = if (isHolding) {
+                    if (activeDirection == 1) theme.bull else theme.bear
+                } else Color.White.copy(alpha = 0.7f)
+
+                // Expanding / pulsating ambient circle
+                drawCircle(
+                    color = ringColor.copy(alpha = 0.14f),
+                    radius = ringRadius + 10.dp.toPx(),
+                    center = pos
+                )
+
+                // Solid ring border
+                drawCircle(
+                    color = ringColor,
+                    radius = ringRadius,
+                    center = pos,
+                    style = Stroke(width = 3.5.dp.toPx())
+                )
+
+                // Direction label floating above ring
+                val cueText = if (activeDirection == 1) "LONG ▲" else "SHORT ▼"
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = cueText,
+                    topLeft = Offset(pos.x - 24.dp.toPx(), pos.y - ringRadius - 22.dp.toPx()),
+                    style = TextStyle(
+                        color = ringColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
+                // Instructional prompt below ring
+                val slidePrompt = if (activeDirection == 1) "SLIDE DOWN TO SHORT" else "SLIDE UP TO LONG"
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = slidePrompt,
+                    topLeft = Offset(pos.x - 52.dp.toPx(), pos.y + ringRadius + 8.dp.toPx()),
+                    style = TextStyle(
+                        color = theme.muted,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+
+            // 11. Screen Flash Overlay on Cashout / Liquidation
+            if (flashAlpha > 0f) {
+                drawRect(
+                    color = flashColor.copy(alpha = flashAlpha),
+                    topLeft = Offset.Zero,
+                    size = size
+                )
             }
         }
     }
