@@ -36,6 +36,35 @@ import com.setuprush.candy.theme.ThemeManager
 import kotlin.math.*
 
 /**
+ * Safe DrawScope text drawer that guards against Compose Constraints crash:
+ * `java.lang.IllegalArgumentException: maxHeight must be >= than minHeight(0)`
+ * which occurs when topLeft.y > size.height or topLeft.x > size.width.
+ */
+private fun DrawScope.drawTextSafe(
+    textMeasurer: TextMeasurer,
+    text: String,
+    topLeft: Offset,
+    style: TextStyle = TextStyle.Default,
+    maxW: Float = 320f,
+    maxH: Float = 90f
+) {
+    if (topLeft.x > size.width || topLeft.y > size.height || topLeft.x < -maxW || topLeft.y < -maxH) {
+        return // Completely outside visible canvas viewport
+    }
+    try {
+        drawText(
+            textMeasurer = textMeasurer,
+            text = text,
+            topLeft = topLeft,
+            style = style,
+            size = Size(maxW, maxH)
+        )
+    } catch (e: Throwable) {
+        // Defensive suppression against text constraints crashes
+    }
+}
+
+/**
  * Pure native Jetpack Compose candlestick chart engine.
  * Delivers 1:1 parity with the authentic Setup Rush canvas physics:
  * - Exponential camera tracking (`_t` and `Ot`) with continuous sub-pixel horizontal scrolling
@@ -212,7 +241,7 @@ fun ChartCanvas(
                     )
                     // Price label on right margin
                     val priceLabel = String.format("%.2f", gridPrice)
-                    drawText(
+                    drawTextSafe(
                         textMeasurer = textMeasurer,
                         text = priceLabel,
                         topLeft = Offset(w - 62.dp.toPx(), gy - 12.dp.toPx()),
@@ -297,7 +326,7 @@ fun ChartCanvas(
                             pathEffect = if (isChoch) PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null
                         )
                         // Structure pill badge
-                        drawText(
+                        drawTextSafe(
                             textMeasurer = textMeasurer,
                             text = sl.label,
                             topLeft = Offset(x1 + 6f, y - 14f),
@@ -431,7 +460,7 @@ fun ChartCanvas(
                     size = Size(pillW, pillH),
                     cornerRadius = CornerRadius(4.dp.toPx())
                 )
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = priceText,
                     topLeft = Offset(pillX + 4.dp.toPx(), pillY + 3.dp.toPx()),
@@ -463,7 +492,7 @@ fun ChartCanvas(
                 val setupColor = if (activeSetup.dir == 1) theme.bull else theme.bear
 
                 // PATTERN LOCKED Reticle Header
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = "PATTERN LOCKED",
                     topLeft = Offset(sMinX, sTopY - 14.dp.toPx()),
@@ -506,7 +535,7 @@ fun ChartCanvas(
                     strokeWidth = 1.6f,
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
                 )
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = "TARGET +2R",
                     topLeft = Offset(w - 60.dp.toPx(), targetY - 12.dp.toPx()),
@@ -526,7 +555,7 @@ fun ChartCanvas(
                     strokeWidth = 1.6f,
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
                 )
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = "STOP -1R",
                     topLeft = Offset(w - 60.dp.toPx(), stopY - 12.dp.toPx()),
@@ -603,7 +632,7 @@ fun ChartCanvas(
 
                 // Left Inner Badge (Tag + Leverage)
                 val tagColor = if (theme.isLight) Color(0xFF191A17) else Color(0xFF07090F)
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = pillTagText,
                     topLeft = Offset(capsuleX + 6.dp.toPx(), capsuleY + 6.dp.toPx()),
@@ -623,7 +652,7 @@ fun ChartCanvas(
                     size = Size(pnlWidth - 2.dp.toPx(), capsuleH - 4.dp.toPx()),
                     cornerRadius = CornerRadius(4.dp.toPx())
                 )
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = pillPnlText,
                     topLeft = Offset(rightBoxX + 6.dp.toPx(), capsuleY + 5.dp.toPx()),
@@ -660,7 +689,7 @@ fun ChartCanvas(
 
                 // Direction label floating above ring
                 val cueText = if (activeDirection == 1) "LONG ▲" else "SHORT ▼"
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = cueText,
                     topLeft = Offset(pos.x - 24.dp.toPx(), pos.y - ringRadius - 22.dp.toPx()),
@@ -674,7 +703,7 @@ fun ChartCanvas(
 
                 // Instructional prompt below ring
                 val slidePrompt = if (activeDirection == 1) "SLIDE DOWN TO SHORT" else "SLIDE UP TO LONG"
-                drawText(
+                drawTextSafe(
                     textMeasurer = textMeasurer,
                     text = slidePrompt,
                     topLeft = Offset(pos.x - 52.dp.toPx(), pos.y + ringRadius + 8.dp.toPx()),
