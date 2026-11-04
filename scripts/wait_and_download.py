@@ -6,17 +6,11 @@ import sys
 
 repo = "GriMReapeR-666/breakout-blitz"
 headers = {"User-Agent": "Mozilla/5.0"}
-
-if len(sys.argv) > 1:
-    target_sha = sys.argv[1][:7]
-else:
-    # Get current git commit SHA
-    res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
-    target_sha = res.stdout.strip()[:7]
+target_sha = "a3c3ace"
 
 print(f"Monitoring GitHub Actions run for commit {target_sha}...", flush=True)
 
-for i in range(50):
+for i in range(40):
     try:
         url = f"https://api.github.com/repos/{repo}/actions/runs"
         req = urllib.request.Request(url, headers=headers)
@@ -33,18 +27,17 @@ for i in range(50):
                 run_id = target_run["id"]
                 status = target_run["status"]
                 conclusion = target_run.get("conclusion")
-                print(f"[{i+1}/50] Run #{run_id}: status={status}, conclusion={conclusion}", flush=True)
+                print(f"[{i+1}/40] Run #{run_id}: status={status}, conclusion={conclusion}", flush=True)
                 if status == "completed":
                     if conclusion == "success":
                         print("Build SUCCESS! Downloading artifact now...", flush=True)
-                        time.sleep(3) # Wait for artifact registration
                         subprocess.run([sys.executable, "scripts/download_apk.py"], check=True)
                         sys.exit(0)
                     else:
                         print(f"Build finished with failure conclusion: {conclusion}", flush=True)
                         sys.exit(1)
             else:
-                print(f"[{i+1}/50] Run for {target_sha} not found yet...", flush=True)
+                print(f"[{i+1}/40] Run for {target_sha} not found yet...", flush=True)
     except Exception as e:
         print(f"Error checking run: {e}", flush=True)
     time.sleep(10)

@@ -29,32 +29,27 @@ import com.setuprush.candy.theme.GameTheme
 import com.setuprush.candy.theme.ThemeCatalog
 import com.setuprush.candy.theme.ThemeManager
 import kotlin.math.abs
+import kotlin.math.max
 
-// Top-Level Institutional Theme Palette
-private val deskCarbonBg = Color(0xFF090C12)
-private val deskPanelBg = Color(0xFF131924)
+// Setup Rush & Quantitative Desk Palette
+private val deskCarbonBg = Color(0xFF0A0C10)
+private val deskPanelBg = Color(0xFF131720)
+private val deskCardBg = Color(0xFF181D28)
 private val deskGold = Color(0xFFFFC700)
 private val deskCyan = Color(0xFF00E5FF)
 private val deskRed = Color(0xFFFF334B)
 private val deskGreen = Color(0xFF00E676)
 private val deskMuted = Color(0xFF8A99AD)
-private val deskBorder = Color(0xFF263345)
+private val deskBorder = Color(0xFF232A38)
+private val deskOrange = Color(0xFFFF5A1F)
 
-/**
- * Clash Royale Anatomy 5-Pillar Navigation Hub.
- * Completely purged of FPS/military references in favor of institutional quantitative trading desk mechanics:
- * - Tab 1: VAULT (Shop, Desk Passes, Capital Allocations, Themes)
- * - Tab 2: ARSENAL (5 Strategy Presets, Primary Model, Tactical Confirmation Trigger, Gunsmith Risk Tuning, Mastery Milestones)
- * - Tab 3 (CENTER): DESK / HOME (Trophy Road MMR, Active Preset Card, Market Killzone, prominent [ COMMENCE SESSION ])
- * - Tab 4: ARENA (Matchmaking: 1v1 Ranked Prop Duel, Solo Strategy Grind, 35-Level Campaign Operations, 100-Trader Royale)
- * - Tab 5: JOURNAL (Career Performance Ledger, Strategy Win-Rates, Mistakes Post-Mortem, Cockpit Audio & HUD)
- */
-enum class MenuNavPillar(val label: String, val icon: String, val subtitle: String) {
-    VAULT("VAULT", "🪙", "Capital & Passes"),
-    ARSENAL("ARSENAL", "📊", "Presets & Tuning"),
-    DESK("DESK", "🏛️", "Live Trading Desk"),
-    ARENA("ARENA", "⚔️", "Matchmaking & Modes"),
-    JOURNAL("JOURNAL", "📋", "Ledger & Mistakes")
+enum class SetupRushNavTab(val label: String, val icon: String) {
+    MODES("ARENA", "⚡"),
+    ACADEMY("ACADEMY", "🎓"),
+    GAME_REVIEW("REVIEW", "♟️"),
+    LEADERBOARD("COMBINE", "🏆"),
+    JOURNAL("JOURNAL", "📋"),
+    THEMES("THEMES", "🎨")
 }
 
 @Composable
@@ -63,17 +58,14 @@ fun GameMenuHub(
     onLaunchGame: (formatId: String, symbol: MarketSymbolCatalog.MarketSymbol, model: TradingModelManager.CustomTradingModel) -> Unit,
     onOpenAcademyDrill: (setup: StrategyCatalog.SetupCardData, tier: Int) -> Unit,
     onLaunchMission: (mission: StrategyMasteryManager.SoloCampaignMission) -> Unit = {},
+    onClose: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Default to Center Desk (Clash Royale Battle Home Tab)
-    var selectedPillar by remember { mutableStateOf(MenuNavPillar.DESK) }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
+    var selectedTab by remember { mutableStateOf(SetupRushNavTab.MODES) }
     var activeSymbol by remember { mutableStateOf(MarketSymbolCatalog.activeSymbol) }
     var activeFormat by remember { mutableStateOf(OpponentDuelEngine.MATCH_FORMATS[0]) }
-    var activePresetSlotIndex by remember { mutableIntStateOf(TradingModelManager.activePresetSlotIndex) }
     var activeModel by remember { mutableStateOf(TradingModelManager.activeTradingModel) }
+    var activePresetSlotIndex by remember { mutableIntStateOf(TradingModelManager.activePresetSlotIndex) }
 
     Box(
         modifier = modifier
@@ -81,7 +73,7 @@ fun GameMenuHub(
             .background(deskCarbonBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ==================== TOP TRADER PROFILE & CREDENTIALS BAR ====================
+            // ==================== 1. MINIMAL SETUP RUSH TOP HEADER ====================
             Surface(
                 color = deskPanelBg,
                 border = BorderStroke(1.dp, deskBorder),
@@ -90,103 +82,93 @@ fun GameMenuHub(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Trader Calling Card & MMR Rank
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = deskGold.copy(alpha = 0.2f),
-                            border = BorderStroke(1.5.dp, deskGold)
-                        ) {
-                            Text(
-                                text = "PROP",
-                                color = deskGold,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            )
-                        }
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = PlayerProfileManager.currentProfile.username.uppercase(),
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 1.sp
-                                )
-                                Surface(
-                                    color = deskCyan.copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(3.dp)
-                                ) {
-                                    Text(
-                                        text = "SENIOR TRADER",
-                                        color = deskCyan,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "🏆 PRO RANK · ${PlayerProfileManager.currentProfile.mmrRating} MMR",
-                                color = deskGold,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
-                    // Virtual Desk Treasury
+                    // Left: Brand Mark & Title
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF1B2332),
+                            color = deskOrange
+                        ) {
+                            Text(
+                                text = "⚡",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "SETUP RUSH",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "INSTITUTIONAL TAPE ENGINE",
+                                color = deskOrange,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    // Middle / Right: Capital Pill & Close Button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = deskCardBg,
                             border = BorderStroke(1.dp, deskBorder)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("💼", fontSize = 10.sp)
                                 Text(
                                     text = "$10,000",
                                     color = deskCyan,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "· ${PlayerProfileManager.currentProfile.mmrRating} MMR",
+                                    color = deskGold,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
                         }
 
+                        // Close / Return to Live Tape Button
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF1B2332),
-                            border = BorderStroke(1.dp, deskBorder)
+                            color = deskOrange.copy(alpha = 0.18f),
+                            border = BorderStroke(1.dp, deskOrange.copy(alpha = 0.6f)),
+                            modifier = Modifier.clickable { onClose() }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text("🪙", fontSize = 10.sp)
                                 Text(
-                                    text = "${MonetizationManager.deskCredits}",
-                                    color = deskGold,
+                                    text = "✕ TAPE",
+                                    color = deskOrange,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     fontFamily = FontFamily.Monospace
@@ -197,103 +179,36 @@ fun GameMenuHub(
                 }
             }
 
-            // ==================== MAIN CONTENT VIEWPORT ====================
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                when (selectedPillar) {
-                    MenuNavPillar.DESK -> DeskHomeContent(
-                        activeSymbol = activeSymbol,
-                        activeFormat = activeFormat,
-                        activeModel = activeModel,
-                        onSelectSymbol = { activeSymbol = it },
-                        onSelectFormat = { activeFormat = it },
-                        onCommenceSession = { onLaunchGame(activeFormat.id, activeSymbol, activeModel) },
-                        onOpenArsenal = { selectedPillar = MenuNavPillar.ARSENAL },
-                        onOpenArena = { selectedPillar = MenuNavPillar.ARENA }
-                    )
-                    MenuNavPillar.ARSENAL -> ArsenalPresetsContent(
-                        theme = theme,
-                        activePresetIndex = activePresetSlotIndex,
-                        onSelectPresetIndex = { idx ->
-                            activePresetSlotIndex = idx
-                            TradingModelManager.selectPreset(idx)
-                            activeModel = TradingModelManager.activeTradingModel
-                        },
-                        activeModel = activeModel,
-                        onModelUpdated = { updated ->
-                            activeModel = updated
-                            TradingModelManager.activeTradingModel = updated
-                        }
-                    )
-                    MenuNavPillar.ARENA -> ArenaMatchmakingContent(
-                        activeSymbol = activeSymbol,
-                        activeFormat = activeFormat,
-                        onSelectFormat = { activeFormat = it },
-                        onLaunchFormat = { fmt ->
-                            activeFormat = fmt
-                            onLaunchGame(fmt.id, activeSymbol, activeModel)
-                        },
-                        onDeployMission = { mission ->
-                            StrategyMasteryManager.activeMission = mission
-                            val matchSymbol = MarketSymbolCatalog.findSymbol(mission.symbolId) ?: activeSymbol
-                            activeSymbol = matchSymbol
-                            onLaunchMission(mission)
-                        }
-                    )
-                    MenuNavPillar.JOURNAL -> JournalCareerContent(theme = theme)
-                    MenuNavPillar.VAULT -> StoreContent(theme = theme)
-                }
-            }
-
-            // ==================== CLASH ROYALE 5-PILLAR BOTTOM NAVIGATION BAR ====================
+            // ==================== 2. HORIZONTAL TAB CAROUSEL ====================
             Surface(
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
+                color = deskCarbonBg,
+                border = BorderStroke(0.5.dp, deskBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MenuNavPillar.values().forEach { pillar ->
-                        val isSelected = selectedPillar == pillar
-                        val isCenterDesk = pillar == MenuNavPillar.DESK
-
+                    items(SetupRushNavTab.values()) { tab ->
+                        val isSelected = selectedTab == tab
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) {
-                                if (isCenterDesk) deskGold.copy(alpha = 0.25f) else deskCyan.copy(alpha = 0.2f)
-                            } else Color.Transparent,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) (if (isCenterDesk) deskGold else deskCyan) else Color.Transparent
-                            ),
-                            modifier = Modifier
-                                .weight(if (isCenterDesk) 1.2f else 1.0f)
-                                .clickable { selectedPillar = pillar }
-                                .padding(horizontal = 2.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) deskOrange else deskPanelBg,
+                            border = BorderStroke(1.dp, if (isSelected) deskOrange else deskBorder),
+                            modifier = Modifier.clickable { selectedTab = tab }
                         ) {
-                            Column(
-                                modifier = Modifier.padding(vertical = 6.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Text(tab.icon, fontSize = 12.sp)
                                 Text(
-                                    text = pillar.icon,
-                                    fontSize = if (isCenterDesk) 18.sp else 15.sp
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = pillar.label,
-                                    color = if (isSelected) (if (isCenterDesk) deskGold else deskCyan) else deskMuted,
-                                    fontSize = if (isCenterDesk) 9.5.sp else 8.5.sp,
+                                    text = tab.label,
+                                    color = if (isSelected) Color.White else deskMuted,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     fontFamily = FontFamily.Monospace,
                                     letterSpacing = 0.5.sp
@@ -303,25 +218,48 @@ fun GameMenuHub(
                     }
                 }
             }
+
+            // ==================== 3. SCROLLABLE TAB CONTENT ====================
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                when (selectedTab) {
+                    SetupRushNavTab.MODES -> SetupRushModesContent(
+                        activeSymbol = activeSymbol,
+                        activeFormat = activeFormat,
+                        activeModel = activeModel,
+                        onSelectSymbol = { activeSymbol = it },
+                        onSelectFormat = { activeFormat = it },
+                        onCommence = { onLaunchGame(activeFormat.id, activeSymbol, activeModel) }
+                    )
+                    SetupRushNavTab.ACADEMY -> SetupRushAcademyContent(
+                        onLaunchDrill = { setup, tier -> onOpenAcademyDrill(setup, tier) },
+                        onDeployMission = onDeployMission
+                    )
+                    SetupRushNavTab.GAME_REVIEW -> SetupRushGameReviewContent(theme = theme)
+                    SetupRushNavTab.LEADERBOARD -> SetupRushLeaderboardContent()
+                    SetupRushNavTab.JOURNAL -> SetupRushJournalContent(theme = theme)
+                    SetupRushNavTab.THEMES -> SetupRushThemesContent()
+                }
+            }
         }
     }
 }
 
-// ==================== 1. CENTER TAB: DESK / HOME (CLASH ROYALE BATTLE TAB) ====================
+// ==================== SUB-VIEW: 1. MODES & COMMENCE SESSION ====================
 
 @Composable
-fun DeskHomeContent(
+fun SetupRushModesContent(
     activeSymbol: MarketSymbolCatalog.MarketSymbol,
     activeFormat: OpponentDuelEngine.MatchFormat,
     activeModel: TradingModelManager.CustomTradingModel,
     onSelectSymbol: (MarketSymbolCatalog.MarketSymbol) -> Unit,
     onSelectFormat: (OpponentDuelEngine.MatchFormat) -> Unit,
-    onCommenceSession: () -> Unit,
-    onOpenArsenal: () -> Unit,
-    onOpenArena: () -> Unit
+    onCommence: () -> Unit
 ) {
-    val prog = StrategyMasteryManager.getProgress(activeModel.setupKey)
-    val confluence = TradingModelManager.getConfluence(activeModel.confluenceIndicatorId)
     val regime = MarketSessionEngine.getDailyMarketRegime()
 
     LazyColumn(
@@ -331,7 +269,7 @@ fun DeskHomeContent(
         // Market Killzone & Regime Banner
         item {
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = deskPanelBg,
                 border = BorderStroke(1.dp, deskBorder),
                 modifier = Modifier.fillMaxWidth()
@@ -343,23 +281,31 @@ fun DeskHomeContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(deskGreen))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(deskGreen)
+                        )
+                        Column {
                             Text(
-                                text = "LIVE REGIME: ${regime.regimeName}",
+                                text = "LIVE REGIME: ${regime.regimeName.uppercase()}",
                                 color = deskGold,
-                                fontSize = 10.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace
                             )
+                            Text(
+                                text = "${MarketSessionEngine.activeSession.sessionName} · ${MarketSessionEngine.activeSession.utcHours} (${MarketSessionEngine.activeSession.volatilityMul}x Volatility)",
+                                color = deskMuted,
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
-                        Text(
-                            text = "${MarketSessionEngine.activeSession.sessionName} · ${MarketSessionEngine.activeSession.utcHours} (${MarketSessionEngine.activeSession.volatilityMul}x Volatility)",
-                            color = deskMuted,
-                            fontSize = 8.5.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
                     }
 
                     Surface(
@@ -368,7 +314,7 @@ fun DeskHomeContent(
                         border = BorderStroke(1.dp, deskGold.copy(alpha = 0.5f))
                     ) {
                         Text(
-                            text = "NEW YORK OPEN",
+                            text = "ORDERFLOW ACTIVE",
                             color = deskGold,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Black,
@@ -396,28 +342,28 @@ fun DeskHomeContent(
                     val isSelected = activeSymbol.id == sym.id
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) deskGold.copy(alpha = 0.18f) else deskPanelBg,
-                        border = BorderStroke(1.5.dp, if (isSelected) deskGold else deskBorder),
+                        color = if (isSelected) deskOrange.copy(alpha = 0.2f) else deskPanelBg,
+                        border = BorderStroke(1.5.dp, if (isSelected) deskOrange else deskBorder),
                         modifier = Modifier.clickable { onSelectSymbol(sym) }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(sym.badge, fontSize = 15.sp)
+                            Text(sym.badge, fontSize = 14.sp)
                             Column {
                                 Text(
                                     text = sym.id,
-                                    color = if (isSelected) deskGold else Color.White,
-                                    fontSize = 11.5.sp,
+                                    color = if (isSelected) deskOrange else Color.White,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
                                     fontFamily = FontFamily.Monospace
                                 )
                                 Text(
                                     text = "$${sym.basePrice.toInt()} · ${sym.volatilityTier}",
                                     color = deskMuted,
-                                    fontSize = 8.5.sp,
+                                    fontSize = 8.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
@@ -427,945 +373,27 @@ fun DeskHomeContent(
             }
         }
 
-        // Prominent Active Preset Deck Card (Clash Royale Style)
+        // Trading Game Modes List
         item {
             Text(
-                text = "ACTIVE STRATEGY PRESET DECK",
+                text = "SELECT TRADING GAME MODE",
                 color = deskMuted,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = 1.sp
             )
-            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        items(OpponentDuelEngine.MATCH_FORMATS) { fmt ->
+            val isSelected = activeFormat.id == fmt.id
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.5.dp, deskGold),
+                shape = RoundedCornerShape(10.dp),
+                color = if (isSelected) deskOrange.copy(alpha = 0.12f) else deskPanelBg,
+                border = BorderStroke(1.5.dp, if (isSelected) deskOrange else deskBorder),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenArsenal() }
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
-                            Text(
-                                text = TradingModelManager.activePreset.slotName,
-                                color = deskGold,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = "PRIMARY MODEL: ${activeModel.name.uppercase()}",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = deskCyan.copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, deskCyan)
-                        ) {
-                            Text(
-                                text = "T${prog.tier} · ${prog.tierTitle}",
-                                color = deskCyan,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Tactical Parameters Grid
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF1B2332),
-                            border = BorderStroke(1.dp, deskBorder),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(6.dp)) {
-                                Text("CONFIRMATION", color = deskMuted, fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = confluence?.displayName?.take(16) ?: "NAKED TAPE",
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF1B2332),
-                            border = BorderStroke(1.dp, deskBorder),
-                            modifier = Modifier.weight(0.7f)
-                        ) {
-                            Column(modifier = Modifier.padding(6.dp)) {
-                                Text("LEVERAGE", color = deskMuted, fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = "${activeModel.leverage.toInt()}x GEAR",
-                                    color = deskCyan,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF1B2332),
-                            border = BorderStroke(1.dp, deskBorder),
-                            modifier = Modifier.weight(0.7f)
-                        ) {
-                            Column(modifier = Modifier.padding(6.dp)) {
-                                Text("RISK : REWARD", color = deskMuted, fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = "1.0R : +${activeModel.takeProfitTargetR.toInt()}R",
-                                    color = deskGreen,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "⚡ Tap card to customize Primary Setup, Indicator Trigger & Risk Gunsmith in Arsenal",
-                        color = deskMuted,
-                        fontSize = 8.5.sp
-                    )
-                }
-            }
-        }
-
-        // Match Mode Chips
-        item {
-            Text(
-                text = "MATCHMAKING FORMAT",
-                color = deskMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(OpponentDuelEngine.MATCH_FORMATS) { fmt ->
-                    val isSelected = activeFormat.id == fmt.id
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) deskCyan.copy(alpha = 0.18f) else deskPanelBg,
-                        border = BorderStroke(1.5.dp, if (isSelected) deskCyan else deskBorder),
-                        modifier = Modifier
-                            .width(160.dp)
-                            .clickable { onSelectFormat(fmt) }
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(fmt.badge, color = deskCyan, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                                if (isSelected) {
-                                    Text("ACTIVE", color = deskCyan, fontSize = 7.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                                }
-                            }
-                            Text(text = fmt.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                            Text(text = fmt.subtitle, color = deskMuted, fontSize = 8.5.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Giant Prominent Clash Royale Commence Session Button
-        item {
-            Spacer(modifier = Modifier.height(6.dp))
-            Button(
-                onClick = onCommenceSession,
-                colors = ButtonDefaults.buttonColors(containerColor = deskGold),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .shadow(16.dp, RoundedCornerShape(10.dp), spotColor = deskGold)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("🏛️", fontSize = 20.sp)
-                    Text(
-                        text = "COMMENCE TRADING SESSION",
-                        color = Color.Black,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.5.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ==================== 2. TAB: ARSENAL / STRATEGY PRESETS & TUNING ====================
-
-@Composable
-fun ArsenalPresetsContent(
-    theme: GameTheme,
-    activePresetIndex: Int,
-    onSelectPresetIndex: (Int) -> Unit,
-    activeModel: TradingModelManager.CustomTradingModel,
-    onModelUpdated: (TradingModelManager.CustomTradingModel) -> Unit
-) {
-    val prog = StrategyMasteryManager.getProgress(activeModel.setupKey)
-    val benchmarks = StrategyMasteryManager.getTraderSkillBenchmarks(activeModel.setupKey)
-
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Preset Slots Switcher Bar (Presets 1 to 5)
-        item {
-            Text(
-                text = "STRATEGY PRESET SLOTS (SAVED DECKS)",
-                color = deskGold,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                (1..5).forEach { slotIdx ->
-                    val isSlotActive = activePresetIndex == slotIdx
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSlotActive) deskGold else deskPanelBg,
-                        border = BorderStroke(1.5.dp, if (isSlotActive) deskGold else deskBorder),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onSelectPresetIndex(slotIdx) }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "SLOT $slotIdx",
-                                color = if (isSlotActive) Color.Black else Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Card 1: Primary Trading Model (Core Setup)
-        item {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "1. PRIMARY TRADING MODEL (CORE SETUP)",
-                            color = deskMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = deskGold.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = activeModel.library.tag,
-                                color = deskGold,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = activeModel.name.uppercase(),
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = activeModel.library.description,
-                        color = deskMuted,
-                        fontSize = 9.5.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "SWAP PRIMARY SETUP PATTERN:",
-                        color = deskMuted,
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(TradingModelManager.PREBUILT_MODELS) { m ->
-                            val isChosen = activeModel.id == m.id
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isChosen) deskGold.copy(alpha = 0.2f) else Color(0xFF1B2332),
-                                border = BorderStroke(1.dp, if (isChosen) deskGold else deskBorder),
-                                modifier = Modifier.clickable {
-                                    val updated = activeModel.copy(
-                                        id = m.id,
-                                        name = m.name,
-                                        library = m.library,
-                                        setupKey = m.setupKey
-                                    )
-                                    onModelUpdated(updated)
-                                }
-                            ) {
-                                Text(
-                                    text = m.setupKey.uppercase(),
-                                    color = if (isChosen) deskGold else Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Card 2: Tactical Confirmation Trigger (Indicator Filter)
-        item {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "2. TACTICAL CONFIRMATION TRIGGER (INDICATOR CONFLUENCE)",
-                        color = deskMuted,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val activeConf = TradingModelManager.getConfluence(activeModel.confluenceIndicatorId)
-                    Text(
-                        text = activeConf?.displayName?.uppercase() ?: "NAKED PRICE ACTION",
-                        color = deskCyan,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = activeConf?.role ?: "Pure price action tape reading without lag.",
-                        color = deskMuted,
-                        fontSize = 9.5.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(TradingModelManager.CONFLUENCE_INDICATORS) { conf ->
-                            val isSel = activeModel.confluenceIndicatorId == conf.id
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isSel) deskCyan.copy(alpha = 0.2f) else Color(0xFF1B2332),
-                                border = BorderStroke(1.dp, if (isSel) deskCyan else deskBorder),
-                                modifier = Modifier.clickable {
-                                    val updated = activeModel.copy(confluenceIndicatorId = conf.id)
-                                    onModelUpdated(updated)
-                                }
-                            ) {
-                                Text(
-                                    text = conf.displayName.take(18),
-                                    color = if (isSel) deskCyan else Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Card 3: Execution & Risk Gunsmith Parameters
-        item {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "3. EXECUTION & RISK PARAMETERS (GUNSMITH TUNING)",
-                        color = deskMuted,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Leverage Gear
-                    Text("LEVERAGE GEAR:", color = deskMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(2.0, 5.0, 10.0, 25.0, 50.0).forEach { lev ->
-                            val isLev = activeModel.leverage == lev
-                            val isLocked = false // Pure trading: trader controls their own leverage
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isLev) deskCyan.copy(alpha = 0.25f) else Color(0xFF1B2332),
-                                border = BorderStroke(1.dp, if (isLev) deskCyan else deskBorder),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(enabled = !isLocked) {
-                                        onModelUpdated(activeModel.copy(leverage = lev))
-                                    }
-                            ) {
-                                Text(
-                                    text = if (isLocked) "50x 🔒" else "${lev.toInt()}x",
-                                    color = if (isLocked) deskMuted else (if (isLev) deskCyan else Color.White),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(vertical = 6.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Take Profit Multiple Target
-                    Text("TAKE PROFIT TARGET (R-MULTIPLE):", color = deskMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(1.5 to "+1.5R SCALP", 2.0 to "+2.0R STANDARD", 3.0 to "+3.0R RUNNER").forEach { (r, label) ->
-                            val isSel = activeModel.takeProfitTargetR == r
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (isSel) deskGreen.copy(alpha = 0.2f) else Color(0xFF1B2332),
-                                border = BorderStroke(1.dp, if (isSel) deskGreen else deskBorder),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        onModelUpdated(activeModel.copy(takeProfitTargetR = r))
-                                    }
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSel) deskGreen else Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(vertical = 6.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Card 4: Strategy Mastery Progression (Real Discipline Benchmarks)
-        item {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "STRATEGY MASTERY PROGRESSION",
-                            color = deskMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "TIER ${prog.tier} / 5",
-                            color = deskGold,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // XP Bar
-                    val xpRatio = (prog.xp.toFloat() / prog.xpRequired.toFloat()).coerceIn(0f, 1f)
-                    LinearProgressIndicator(
-                        progress = { xpRatio },
-                        color = deskGold,
-                        trackColor = Color(0xFF1B2332),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("${prog.xp} / ${prog.xpRequired} XP", color = deskMuted, fontSize = 9.sp)
-                        Text("WIN RATE: ${(prog.winRate * 100).toInt()}% (${prog.winCount}W - ${prog.lossCount}L)", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("REAL TRADER SKILL BENCHMARKS (NO ARTIFICIAL RPG PERKS):", color = deskMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        benchmarks.forEach { b ->
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF1B2332),
-                                border = BorderStroke(0.5.dp, deskBorder),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(b.icon, fontSize = 13.sp)
-                                        Column {
-                                            Text(b.title, color = Color.White, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                                            Text(b.description, color = deskMuted, fontSize = 8.sp)
-                                        }
-                                    }
-                                    Text(b.valueText, color = deskCyan, fontSize = 9.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==================== 3. TAB: ARENA / MATCHMAKING & CAMPAIGN ====================
-
-@Composable
-fun ArenaMatchmakingContent(
-    activeSymbol: MarketSymbolCatalog.MarketSymbol,
-    activeFormat: OpponentDuelEngine.MatchFormat,
-    onSelectFormat: (OpponentDuelEngine.MatchFormat) -> Unit,
-    onLaunchFormat: (OpponentDuelEngine.MatchFormat) -> Unit,
-    onDeployMission: (StrategyMasteryManager.SoloCampaignMission) -> Unit
-) {
-    var arenaTab by remember { mutableIntStateOf(0) } // 0 = Matchmaking Arena, 1 = 35 Solo Operations
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Tab Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (arenaTab == 0) deskCyan.copy(alpha = 0.2f) else deskPanelBg,
-                border = BorderStroke(1.dp, if (arenaTab == 0) deskCyan else deskBorder),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { arenaTab = 0 }
-            ) {
-                Text(
-                    text = "⚔️ COMPETITIVE ARENA",
-                    color = if (arenaTab == 0) deskCyan else deskMuted,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (arenaTab == 1) deskGold.copy(alpha = 0.2f) else deskPanelBg,
-                border = BorderStroke(1.dp, if (arenaTab == 1) deskGold else deskBorder),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { arenaTab = 1 }
-            ) {
-                Text(
-                    text = "🎯 35 OPERATIONS",
-                    color = if (arenaTab == 1) deskGold else deskMuted,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (arenaTab == 0) {
-            // Competitive Modes List
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(OpponentDuelEngine.MATCH_FORMATS) { fmt ->
-                    val isSel = activeFormat.id == fmt.id
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSel) deskCyan.copy(alpha = 0.12f) else deskPanelBg,
-                        border = BorderStroke(1.5.dp, if (isSel) deskCyan else deskBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelectFormat(fmt) }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(fmt.badge, fontSize = 16.sp)
-                                    Text(fmt.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                                }
-                                Text(fmt.subtitle, color = deskCyan, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            Button(
-                                onClick = { onLaunchFormat(fmt) },
-                                colors = ButtonDefaults.buttonColors(containerColor = if (isSel) deskCyan else Color(0xFF1B2332)),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.padding(start = 8.dp)
-                            ) {
-                                Text(
-                                    text = "COMMENCE",
-                                    color = if (isSel) Color.Black else Color.White,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // 35 Operations Campaign View
-            TacticalCampaignContent(
-                tacticalGold = deskGold,
-                tacticalCyan = deskCyan,
-                tacticalPanelBg = deskPanelBg,
-                tacticalBorder = deskBorder,
-                tacticalMuted = deskMuted,
-                onDeployMission = onDeployMission
-            )
-        }
-    }
-}
-
-// ==================== 4. TAB: JOURNAL / CAREER LEDGER & POST-MORTEM ====================
-
-@Composable
-fun JournalCareerContent(
-    theme: GameTheme
-) {
-    val allProgress = StrategyMasteryManager.getAllProgress()
-    val totalTrades = allProgress.sumOf { it.winCount + it.lossCount }
-    val totalWins = allProgress.sumOf { it.winCount }
-    val overallWinRate = if (totalTrades == 0) 0.0 else (totalWins.toDouble() / totalTrades.toDouble()) * 100.0
-
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Setup Rush LuxAlgo Edge Score Banner
-        item {
-            val edgeScore = MatchPerformanceEngine.computeEdgeScore(overallWinRate, 2.40, 4)
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.5.dp, deskGold),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("⚡", fontSize = 14.sp)
-                            Text("SETUP RUSH EDGE SCORE", color = deskGold, fontSize = 11.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                        }
-                        Text("Calculated from win rate, profit factor & risk discipline", color = deskMuted, fontSize = 8.5.sp)
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = deskGold.copy(alpha = 0.2f),
-                        border = BorderStroke(1.dp, deskGold)
-                    ) {
-                        Text(
-                            text = "$edgeScore / 100",
-                            color = deskGold,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Career Performance Metrics Cards
-        item {
-            Text(
-                text = "CAREER PERFORMANCE LEDGER",
-                color = deskGold,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = deskPanelBg,
-                    border = BorderStroke(1.dp, deskBorder),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("WIN RATE", color = deskMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("${String.format("%.1f", overallWinRate)}%", color = deskGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = deskPanelBg,
-                    border = BorderStroke(1.dp, deskBorder),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("TOTAL TRADES", color = deskMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("$totalTrades", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = deskPanelBg,
-                    border = BorderStroke(1.dp, deskBorder),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("PROFIT FACTOR", color = deskMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Text("2.40", color = deskGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        }
-
-        // Common Execution Mistakes & Post-Mortem Solutions Guide
-        item {
-            Text(
-                text = "TRADING LEAKS & POST-MORTEM SOLUTIONS",
-                color = deskMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(
-                    Triple("⚠️ CHASED EXTENDED MOVE", "Entering >2 candles late after price expanded.", "Never chase. Wait for the retest pullback into the key zone or pass."),
-                    Triple("⏳ PREMATURE CASH-OUT", "Exiting at +0.5R, leaving +1.5R on the table.", "Trust your invalidation stop. Shift stop to breakeven at +1R and hold for full target."),
-                    Triple("❌ PREMATURE FOMO", "Entering before the setup candle closed.", "Wait for the confirmation close to avoid being trapped on long wick fakeouts."),
-                    Triple("🛑 STOP-LOSS IGNORED", "Holding position through deep drawdown into liquidation.", "Always honor your invalidation point. Cut the loss immediately when setup fails.")
-                ).forEach { (title, diag, sol) ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = deskPanelBg,
-                        border = BorderStroke(1.dp, deskBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(title, color = deskGold, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                            Text("Diagnosis: $diag", color = deskMuted, fontSize = 9.sp)
-                            Text("💡 Solution: $sol", color = deskGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Strategy Breakdown Ledger
-        item {
-            Text(
-                text = "STRATEGY WIN-RATE MATRIX",
-                color = deskMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = deskPanelBg,
-                border = BorderStroke(1.dp, deskBorder),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    allProgress.forEach { p ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(p.key.uppercase(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            Text("TIER ${p.tier} · ${p.winCount}W/${p.lossCount}L (${(p.winRate * 100).toInt()}%)", color = deskCyan, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Terminal Cockpit Settings
-        item {
-            TacticalSettingsContent()
-        }
-    }
-}
-
-// ==================== TACTICAL SOLO CAMPAIGN VIEW (35 LEVELS) ====================
-
-@Composable
-fun TacticalCampaignContent(
-    tacticalGold: Color,
-    tacticalCyan: Color,
-    tacticalPanelBg: Color,
-    tacticalBorder: Color,
-    tacticalMuted: Color,
-    onDeployMission: (StrategyMasteryManager.SoloCampaignMission) -> Unit
-) {
-    val missions = remember { StrategyMasteryManager.getAllCampaignMissions() }
-    val families = StrategyCatalog.StrategyFamily.values()
-    var selectedFamily by remember { mutableStateOf(StrategyCatalog.StrategyFamily.SMC) }
-
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Strategy Family Selector Pills
-        item {
-            Text(
-                text = "STRATEGY FAMILY CURRICULUM",
-                color = tacticalMuted,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(families) { fam ->
-                    val isSelected = selectedFamily == fam
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isSelected) tacticalGold else tacticalPanelBg,
-                        border = BorderStroke(1.dp, if (isSelected) tacticalGold else tacticalBorder),
-                        modifier = Modifier.clickable { selectedFamily = fam }
-                    ) {
-                        Text(
-                            text = fam.name,
-                            color = if (isSelected) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // 5 Progressive Missions in Selected Family
-        val famMissions = missions.filter { it.family == selectedFamily }
-        items(famMissions) { mission ->
-            val isLocked = !mission.isUnlocked
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isLocked) tacticalPanelBg.copy(alpha = 0.5f) else tacticalPanelBg,
-                border = BorderStroke(1.5.dp, if (mission.starsEarned > 0) tacticalGold else tacticalBorder),
-                modifier = Modifier.fillMaxWidth()
+                    .clickable { onSelectFormat(fmt) }
             ) {
                 Row(
                     modifier = Modifier
@@ -1375,124 +403,756 @@ fun TacticalCampaignContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(fmt.badge, fontSize = 16.sp)
                             Text(
-                                text = "OP ${mission.levelId}: ${mission.title}",
-                                color = if (isLocked) tacticalMuted else Color.White,
-                                fontSize = 12.sp,
+                                text = fmt.title.uppercase(),
+                                color = if (isSelected) Color.White else deskMuted,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace
                             )
-                            if (mission.starsEarned > 0) {
-                                Text(
-                                    text = "⭐".repeat(mission.starsEarned),
-                                    fontSize = 11.sp
-                                )
+                            if (isSelected) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = deskOrange
+                                ) {
+                                    Text(
+                                        text = "SELECTED",
+                                        color = Color.White,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "PATTERN: ${mission.targetSetupKey.uppercase()} [${mission.targetBias}] · ${mission.symbolId}",
-                            color = if (isLocked) tacticalMuted else tacticalCyan,
+                            text = fmt.subtitle,
+                            color = deskMuted,
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = mission.briefing,
-                            color = tacticalMuted,
-                            fontSize = 9.sp,
-                            maxLines = 2
                         )
                     }
 
-                    Button(
-                        onClick = { onDeployMission(mission) },
-                        enabled = !isLocked,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (mission.starsEarned > 0) tacticalGold else tacticalCyan,
-                            disabledContainerColor = Color(0xFF1B2332)
-                        ),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.padding(start = 8.dp)
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onSelectFormat(fmt) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = deskOrange,
+                            unselectedColor = deskBorder
+                        )
+                    )
+                }
+            }
+        }
+
+        // Prominent Commence Session Button
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+            Button(
+                onClick = onCommence,
+                colors = ButtonDefaults.buttonColors(containerColor = deskOrange),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .shadow(16.dp, RoundedCornerShape(10.dp), spotColor = deskOrange)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("⚡", fontSize = 18.sp)
+                    Text(
+                        text = "COMMENCE ${activeFormat.title.uppercase()}",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+// ==================== SUB-VIEW: 2. STRATEGY ACADEMY CURRICULUM ====================
+
+@Composable
+fun SetupRushAcademyContent(
+    onLaunchDrill: (setup: StrategyCatalog.SetupCardData, tier: Int) -> Unit,
+    onDeployMission: (StrategyMasteryManager.SoloCampaignMission) -> Unit
+) {
+    var selectedSetupKey by remember { mutableStateOf("sweep") }
+    val setupCards = StrategyCatalog.ALL_SETUPS
+    val activeSetupCard = setupCards.find { it.key == selectedSetupKey } ?: setupCards[0]
+    val prog = StrategyMasteryManager.getProgress(selectedSetupKey)
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Strategy Selection Horizontal Row
+        item {
+            Text(
+                text = "SELECT STRATEGY MODEL",
+                color = deskMuted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(setupCards) { sc ->
+                    val isSel = sc.key == selectedSetupKey
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSel) deskOrange.copy(alpha = 0.2f) else deskPanelBg,
+                        border = BorderStroke(1.5.dp, if (isSel) deskOrange else deskBorder),
+                        modifier = Modifier.clickable { selectedSetupKey = sc.key }
                     ) {
                         Text(
-                            text = if (isLocked) "LOCKED 🔒" else if (mission.starsEarned > 0) "REPLAY" else "START",
-                            color = if (isLocked) tacticalMuted else Color.Black,
-                            fontSize = 10.sp,
+                            text = sc.name.uppercase(),
+                            color = if (isSel) deskOrange else Color.White,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Active Strategy Overview Card
+        item {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = activeSetupCard.name.uppercase(),
+                            color = Color.White,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = deskOrange.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "CURRENT: T${prog.tier} ${prog.tierTitle}",
+                                color = deskOrange,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = activeSetupCard.description,
+                        color = deskMuted,
+                        fontSize = 9.5.sp
+                    )
+                }
+            }
+        }
+
+        // 5-Tier Mastery Progression Levels
+        item {
+            Text(
+                text = "5-TIER MASTERY PROGRESSION",
+                color = deskMuted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+        }
+
+        val tiers = listOf(
+            Triple(1, "Tier 1: Recognition & Trigger Lock", "Pass constraint: Catch rate >= 80% on closed pattern trigger. Max loss <= 1.0R."),
+            Triple(2, "Tier 2: Invalidation & Risk Discipline", "Pass constraint: Zero chased entries (> 1.2 ATR late). Cut immediately at stop."),
+            Triple(3, "Tier 3: Runner Capture & MFE Ratio", "Pass constraint: MFE capture ratio >= 65%. Hold to full +2.0R target."),
+            Triple(4, "Tier 4: Volatility Stress Test", "Pass constraint: Profit factor >= 1.75 across 10 dynamic volatility session expansions."),
+            Triple(5, "Tier 5: Grandmaster Combine", "Pass constraint: 15 trades, Win rate >= 65%, PF >= 2.20, LuxAlgo Edge Score >= 85.")
+        )
+
+        items(tiers) { (tierNum, title, desc) ->
+            val isUnlocked = tierNum <= prog.tier
+            val isCompleted = tierNum < prog.tier
+
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = if (isUnlocked) deskPanelBg else deskCardBg.copy(alpha = 0.4f),
+                border = BorderStroke(1.dp, if (isCompleted) deskGreen else if (isUnlocked) deskOrange else deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (isCompleted) "✅" else if (isUnlocked) "🎯" else "🔒",
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = title,
+                                color = if (isUnlocked) Color.White else deskMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = desc,
+                            color = deskMuted,
+                            fontSize = 8.5.sp
+                        )
+                    }
+
+                    if (isUnlocked) {
+                        Button(
+                            onClick = { onLaunchDrill(activeSetupCard, tierNum) },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isCompleted) deskCardBg else deskOrange),
+                            border = if (isCompleted) BorderStroke(1.dp, deskGreen) else null,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text(
+                                text = if (isCompleted) "REPLAY" else "DRILL",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== SUB-VIEW: 3. CHESS.COM GAME REVIEW ====================
+
+@Composable
+fun SetupRushGameReviewContent(theme: GameTheme) {
+    val debrief = MatchPerformanceEngine.lastDebrief
+    var selectedMoveIndex by remember { mutableIntStateOf(0) }
+
+    if (debrief == null || debrief.tradeReviews.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("♟️", fontSize = 36.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "NO COMPLETED TRADING SESSION",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Execute trades in ARENA or ACADEMY to generate your Chess.com candlestick review.",
+                    color = deskMuted,
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
+    val trades = debrief.tradeReviews
+    val activeMove = trades.getOrElse(selectedMoveIndex) { trades[0] }
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Accuracy Header Card (Chess.com Style)
+        item {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.5.dp, deskOrange),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "SESSION ACCURACY RATING",
+                                color = deskMuted,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "${String.format("%.1f", debrief.accuracyScore)}%",
+                                    color = deskOrange,
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "· GRADE ${debrief.performanceGrade}",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = deskOrange.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, deskOrange)
+                        ) {
+                            Text(
+                                text = "${debrief.modeTitle.take(16).uppercase()}",
+                                color = deskOrange,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Accuracy Progress Bar
+                    val frac = (debrief.accuracyScore / 100.0).toFloat().coerceIn(0f, 1f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Color(0xFF232A38))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(frac)
+                                .background(deskOrange)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Move Classification Pills Row
+        item {
+            Text(
+                text = "MOVE CLASSIFICATION BREAKDOWN",
+                color = deskMuted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val counts = debrief.moveCounts
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(MatchPerformanceEngine.MoveGrade.values()) { grade ->
+                    val count = counts[grade] ?: 0
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(grade.colorHex).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color(grade.colorHex).copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(grade.badge, fontSize = 11.sp)
+                            Text(
+                                text = "${grade.label} ($count)",
+                                color = Color(grade.colorHex),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Interactive Move Scrubber
+        item {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    // Navigation Bar: Previous < Trade X of Y > Next
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { if (selectedMoveIndex > 0) selectedMoveIndex-- },
+                            enabled = selectedMoveIndex > 0,
+                            colors = ButtonDefaults.buttonColors(containerColor = deskCardBg),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("< PREV", fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        }
+
+                        Text(
+                            text = "TRADE ${selectedMoveIndex + 1} OF ${trades.size}",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+
+                        Button(
+                            onClick = { if (selectedMoveIndex < trades.size - 1) selectedMoveIndex++ },
+                            enabled = selectedMoveIndex < trades.size - 1,
+                            colors = ButtonDefaults.buttonColors(containerColor = deskCardBg),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("NEXT >", fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Move Grade Badge & Title
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(activeMove.moveGrade.badge, fontSize = 16.sp)
+                            Text(
+                                text = "${activeMove.moveGrade.label} (${activeMove.moveGrade.symbol})",
+                                color = Color(activeMove.moveGrade.colorHex),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Text(
+                            text = "${if (activeMove.pnl >= 0) "+$" else "-$"}${String.format("%.2f", abs(activeMove.pnl))} (${if (activeMove.rMultiple >= 0) "+" else ""}${String.format("%.1f", activeMove.rMultiple)}R)",
+                            color = if (activeMove.pnl >= 0) deskGreen else deskRed,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                }
-            }
-        }
-    }
-}
 
-// ==================== TERMINAL COCKPIT SETTINGS ====================
+                    Spacer(modifier = Modifier.height(6.dp))
 
-@Composable
-fun TacticalSettingsContent() {
-    var isMuted by remember { mutableStateOf(SoundEffectManager.isMuted) }
-    var hapticsOn by remember { mutableStateOf(true) }
-
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = deskPanelBg,
-        border = BorderStroke(1.dp, deskBorder),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "TERMINAL COCKPIT & AUDIO CONFIGURATION",
-                color = deskGold,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("MASTER AUDIO & DESK SFX", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    Text("Realistic terminal tick, cash out, and stop-loss notifications", color = deskMuted, fontSize = 9.sp)
-                }
-                Switch(
-                    checked = !isMuted,
-                    onCheckedChange = {
-                        isMuted = !it
-                        SoundEffectManager.isMuted = !it
+                    // Key Metrics Pill Box
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = deskCardBg,
+                        border = BorderStroke(1.dp, deskBorder),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("SETUP", color = deskMuted, fontSize = 7.5.sp, fontFamily = FontFamily.Monospace)
+                                Text(activeMove.setupName.take(14), color = Color.White, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column {
+                                Text("DIRECTION", color = deskMuted, fontSize = 7.5.sp, fontFamily = FontFamily.Monospace)
+                                Text(if (activeMove.direction > 0) "LONG ▲" else "SHORT ▼", color = if (activeMove.direction > 0) deskGreen else deskRed, fontSize = 9.5.sp, fontWeight = FontWeight.Black)
+                            }
+                            Column {
+                                Text("ENTRY → EXIT", color = deskMuted, fontSize = 7.5.sp, fontFamily = FontFamily.Monospace)
+                                Text("${String.format("%.2f", activeMove.entryPrice)} → ${String.format("%.2f", activeMove.exitPrice)}", color = Color.White, fontSize = 9.5.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
                     }
-                )
-            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("TACTILE HAPTIC FEEDBACK", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    Text("Intense tactile vibration upon entering and exiting trades", color = deskMuted, fontSize = 9.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Coach Commentary
+                    Text(
+                        text = "🧠 COACH DIAGNOSIS:",
+                        color = deskGold,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = activeMove.mistakeDiagnosis,
+                        color = Color.White,
+                        fontSize = 10.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Actionable Rule / Solution
+                    Text(
+                        text = "💡 PLAYBOOK RULE:",
+                        color = deskCyan,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = activeMove.actionableSolution,
+                        color = deskMuted,
+                        fontSize = 10.sp
+                    )
                 }
-                Switch(
-                    checked = hapticsOn,
-                    onCheckedChange = { hapticsOn = it }
-                )
             }
         }
     }
 }
 
-// ==================== STORE / VAULT VIEW ====================
+// ==================== SUB-VIEW: 4. COMBINE LEADERBOARD ====================
 
 @Composable
-fun StoreContent(theme: GameTheme) {
-    val currentTheme = ThemeManager.currentTheme.value
-    val themes = remember { ThemeCatalog.all() }
+fun SetupRushLeaderboardContent() {
+    val leaders = listOf(
+        TraderLeaderRow(1, "Satoshi_Sniper", "TITAN", "Sweep Rejection", 94, 76.5, 3.42, 2.1, 42500.0),
+        TraderLeaderRow(2, "Apex_Flow", "SIGMA", "FVG Retest", 91, 71.0, 2.85, 3.0, 38200.0),
+        TraderLeaderRow(3, "Wick_Harvester", "PROP", "Order Block", 88, 68.4, 2.60, 3.8, 31400.0),
+        TraderLeaderRow(4, "Delta_Neutral", "QUANT", "Break of Structure", 86, 65.0, 2.25, 4.2, 27900.0),
+        TraderLeaderRow(5, "Titan_Scalper", "TITAN", "Trend Expansion", 84, 62.8, 2.10, 4.5, 24100.0)
+    )
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "DAILY COMBINE STANDINGS · 24H SYNCHRONIZED SEED",
+                        color = deskGold,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Traders ranked by LuxAlgo Edge Score (Win Rate 40%, Profit Factor 35%, Streak 25%).",
+                        color = deskMuted,
+                        fontSize = 8.5.sp
+                    )
+                }
+            }
+        }
+
+        items(leaders) { r ->
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, if (r.rank == 1) deskGold else deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (r.rank == 1) deskGold else deskCardBg
+                        ) {
+                            Text(
+                                text = "#${r.rank}",
+                                color = if (r.rank == 1) Color.Black else Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(r.name, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                                Text("[${r.desk}]", color = deskCyan, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
+                            Text("Model: ${r.strategy}", color = deskMuted, fontSize = 8.5.sp)
+                        }
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "EDGE: ${r.edgeScore}/100",
+                            color = deskGold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "${r.winRate}% WR · ${r.profitFactor} PF · +$${String.format("%,.0f", r.pnl)}",
+                            color = deskGreen,
+                            fontSize = 8.5.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class TraderLeaderRow(
+    val rank: Int,
+    val name: String,
+    val desk: String,
+    val strategy: String,
+    val edgeScore: Int,
+    val winRate: Double,
+    val profitFactor: Double,
+    val maxDrawdownPct: Double,
+    val pnl: Double
+)
+
+// ==================== SUB-VIEW: 5. JOURNAL & LEAK ANALYSIS ====================
+
+@Composable
+fun SetupRushJournalContent(theme: GameTheme) {
+    val debrief = MatchPerformanceEngine.lastDebrief
+    val coachNotes = MatchPerformanceEngine.generateCoachingInsights(
+        playbookKey = "sweep",
+        winRatePct = debrief?.playerStats?.winRatePct ?: 65.0,
+        profitFactor = debrief?.playerStats?.profitFactor ?: 2.1,
+        totalTrades = debrief?.tradeReviews?.size ?: 5,
+        chasedCount = SetupExecutionTimingEngine.chasedEntriesCount,
+        prematureExitCount = debrief?.tradeReviews?.count { it.mistakeCategory == MatchPerformanceEngine.MistakeCategory.PREMATURE_EXIT } ?: 0,
+        bestStreak = debrief?.playerStats?.bestStreak ?: 3
+    )
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "ALGORITHMIC RISK & LEAK COACHING",
+                        color = deskGold,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Automated post-session edge diagnostics derived from Setup Rush journal.js.",
+                        color = deskMuted,
+                        fontSize = 8.5.sp
+                    )
+                }
+            }
+        }
+
+        items(coachNotes) { note ->
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = deskPanelBg,
+                border = BorderStroke(1.dp, deskBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text("💡", fontSize = 14.sp)
+                    Text(
+                        text = note,
+                        color = Color.White,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==================== SUB-VIEW: 6. SETUP RUSH THEMES ====================
+
+@Composable
+fun SetupRushThemesContent() {
+    val allThemes = ThemeCatalog.ALL_THEMES
+    val currentKey = ThemeManager.currentTheme.value.key
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1500,59 +1160,72 @@ fun StoreContent(theme: GameTheme) {
     ) {
         item {
             Text(
-                text = "PROP VAULT & CAPITAL ALLOCATIONS",
-                color = deskGold,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace
-            )
-            Text(
-                text = "Combine evaluations, desk passes, and chart themes earned through performance",
+                text = "SETUP RUSH VISUAL THEMES (12 PALETTES)",
                 color = deskMuted,
-                fontSize = 10.sp
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
             )
         }
 
-        item {
+        items(allThemes) { t ->
+            val isCurrent = t.key == currentKey
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = deskGold.copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, deskGold),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(10.dp),
+                color = if (isCurrent) deskOrange.copy(alpha = 0.15f) else deskPanelBg,
+                border = BorderStroke(1.5.dp, if (isCurrent) deskOrange else deskBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { ThemeManager.setTheme(t.key) }
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("👑 COMBINE ALLOCATION PASS", color = deskGold, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    Text("5,000 Credits + Golden Candlestick Theme (Purely Virtual Credits & Chart Aesthetics)", color = deskMuted, fontSize = 9.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Button(
-                        onClick = {
-                            MonetizationManager.addCredits(5000)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = deskGold)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("CLAIM CREDITS", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(t.bg)
+                                .border(1.dp, t.grid, RoundedCornerShape(4.dp))
+                        )
+                        Column {
+                            Text(
+                                text = t.name.uppercase(),
+                                color = if (isCurrent) Color.White else deskMuted,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Bull: ${if (t.isLight) "Light" else "Dark"} Mode · Key: ${t.key}",
+                                color = deskMuted,
+                                fontSize = 8.5.sp
+                            )
+                        }
                     }
-                }
-            }
-        }
 
-        item {
-            Text("CHART THEMES & VISUAL RETICLES", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-            Spacer(modifier = Modifier.height(4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(themes) { th ->
-                    val isSel = currentTheme.id == th.id
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = deskPanelBg,
-                        border = BorderStroke(1.dp, if (isSel) deskGold else deskBorder),
-                        modifier = Modifier
-                            .width(130.dp)
-                            .clickable { ThemeManager.setTheme(th.id) }
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text(th.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            Text(if (isSel) "ACTIVE" else "SELECT", color = deskGold, fontSize = 8.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                    if (isCurrent) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = deskOrange
+                        ) {
+                            Text(
+                                text = "ACTIVE",
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
                     }
                 }

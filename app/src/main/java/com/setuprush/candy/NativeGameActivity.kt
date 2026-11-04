@@ -431,6 +431,19 @@ fun NativeGameScreen(
                     MatchPerformanceEngine.MistakeCategory.COUNTER_TREND -> "Align entries with the Tactical Confirmation Trigger."
                     MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Optimal execution. Repeat this exact trade process."
                 }
+                val moveGrade = when {
+                    isWin && rMult >= 1.8 && (timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.SNIPER_PERFECT || captureRatio >= 0.85) -> MatchPerformanceEngine.MoveGrade.BRILLIANT
+                    isWin && rMult >= 1.5 -> MatchPerformanceEngine.MoveGrade.BEST
+                    isWin && !isCutEarly -> MatchPerformanceEngine.MoveGrade.EXCELLENT
+                    isWin -> MatchPerformanceEngine.MoveGrade.INACCURACY
+                    mistakeCat == MatchPerformanceEngine.MistakeCategory.DISCIPLINED_STOP -> MatchPerformanceEngine.MoveGrade.DISCIPLINED_STOP
+                    mistakeCat == MatchPerformanceEngine.MistakeCategory.CHASED_ENTRY || mistakeCat == MatchPerformanceEngine.MistakeCategory.UNCONFIRMED_EARLY -> MatchPerformanceEngine.MoveGrade.MISTAKE
+                    else -> MatchPerformanceEngine.MoveGrade.BLUNDER
+                }
+
+                val calculatedStop = tradeEntryPrice - activeDirection * (tradeEntryPrice * 0.002)
+                val calculatedTarget = tradeEntryPrice + activeDirection * 2.0 * (tradeEntryPrice * 0.002)
+
                 sessionTradeReviews.add(
                     MatchPerformanceEngine.TradeReviewRecord(
                         tradeNumber = sessionTradeReviews.size + 1,
@@ -443,7 +456,12 @@ fun NativeGameScreen(
                         timingBadge = timingGrade.badge + " " + timingGrade.title,
                         mistakeCategory = mistakeCat,
                         mistakeDiagnosis = diag,
-                        actionableSolution = sol
+                        actionableSolution = sol,
+                        moveGrade = moveGrade,
+                        stopLossPrice = calculatedStop,
+                        targetPrice = calculatedTarget,
+                        mfeCaptureRatio = captureRatio,
+                        candleIndex = tapePosition.toInt()
                     )
                 )
 
@@ -819,7 +837,7 @@ fun NativeGameScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
+                .padding(horizontal = 14.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -1005,9 +1023,9 @@ fun NativeGameScreen(
                     showMasterMenuHub = false
                     lastOutcome = "OPERATION LAUNCHED: ${mission.callsign} | CATCH ${mission.targetSetupKey.uppercase()}"
                 },
+                onClose = { showMasterMenuHub = false },
                 modifier = Modifier
                     .fillMaxSize()
-                    
             )
         }
 

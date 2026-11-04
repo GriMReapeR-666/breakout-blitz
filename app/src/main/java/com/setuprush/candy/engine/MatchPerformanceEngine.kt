@@ -84,6 +84,23 @@ object MatchPerformanceEngine {
         return insights
     }
 
+enum class MoveGrade(
+        val label: String,
+        val badge: String,
+        val symbol: String,
+        val colorHex: Long,
+        val weight: Double
+    ) {
+        BRILLIANT("BRILLIANT", "💎", "!!", 0xFF00E5FF, 1.0),
+        BEST("BEST", "🎯", "!", 0xFF00E676, 1.0),
+        EXCELLENT("EXCELLENT", "✨", "✓", 0xFF69F0AE, 0.95),
+        GOOD("GOOD", "👍", "•", 0xFFB0BEC5, 0.85),
+        DISCIPLINED_STOP("DISCIPLINED STOP", "🛡️", "🛡️", 0xFF448AFF, 0.95),
+        INACCURACY("INACCURACY", "⚠️", "?!", 0xFFFFD54F, 0.65),
+        MISTAKE("MISTAKE", "❌", "?", 0xFFFF9800, 0.40),
+        BLUNDER("BLUNDER", "💥", "??", 0xFFFF334B, 0.10)
+    }
+
     enum class MistakeCategory(val label: String, val badge: String) {
         NONE_FLAWLESS("FLAWLESS EXECUTION", "🎯"),
         CHASED_ENTRY("CHASED EXTENDED MOVE", "⚠️"),
@@ -105,7 +122,12 @@ object MatchPerformanceEngine {
         val timingBadge: String,
         val mistakeCategory: MistakeCategory,
         val mistakeDiagnosis: String,
-        val actionableSolution: String
+        val actionableSolution: String,
+        val moveGrade: MoveGrade = MoveGrade.GOOD,
+        val stopLossPrice: Double = 0.0,
+        val targetPrice: Double = 0.0,
+        val mfeCaptureRatio: Double = 1.0,
+        val candleIndex: Int = 0
     )
 
     data class TraderMatchStats(
@@ -159,8 +181,14 @@ object MatchPerformanceEngine {
         val xpEarned: Int,
         val performanceGrade: String, // A+, A, B, C, F
         val feedbackSummary: String,
-        val tradeReviews: List<TradeReviewRecord> = emptyList()
-    )
+        val tradeReviews: List<TradeReviewRecord> = emptyList(),
+        val accuracyScore: Double = 85.0
+    ) {
+        val moveCounts: Map<MoveGrade, Int>
+            get() = MoveGrade.values().associateWith { grade ->
+                tradeReviews.count { it.moveGrade == grade }
+            }
+    }
 
     // Pre-configured Daily & Mode-Specific Challenges
     val ACTIVE_CHALLENGES = mutableListOf(
@@ -312,6 +340,14 @@ object MatchPerformanceEngine {
         }
         val enhancedSummary = if (timingNote.isNotEmpty()) "$summary$timingNote" else summary
 
+        // Chess.com Accuracy Rating calculation (0.0% to 100.0%)
+        val calculatedAccuracy = if (tradeReviews.isEmpty()) {
+            ((winRate * 0.65) + (if (profitFactor >= 2.0) 35.0 else profitFactor * 17.5)).coerceIn(50.0, 99.0)
+        } else {
+            val totalWeight = tradeReviews.sumOf { it.moveGrade.weight }
+            (totalWeight / tradeReviews.size.toDouble() * 100.0).coerceIn(15.0, 99.5)
+        }
+
         val debrief = MatchDebrief(
             matchId = "MATCH-${System.currentTimeMillis() % 100000}",
             modeId = modeId,
@@ -331,7 +367,8 @@ object MatchPerformanceEngine {
             xpEarned = xpDelta + medals.sumOf { it.xpBonus },
             performanceGrade = grade,
             feedbackSummary = enhancedSummary,
-            tradeReviews = tradeReviews
+            tradeReviews = tradeReviews,
+            accuracyScore = calculatedAccuracy
         )
 
         lastDebrief = debrief

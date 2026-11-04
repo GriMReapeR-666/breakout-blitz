@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
  * between Native Compose and WebView.
  */
 object ThemeManager {
-    private val _currentTheme = mutableStateOf(ThemeCatalog.get("night"))
+    private val _currentTheme = mutableStateOf(ThemeCatalog.get("pro"))
     val currentTheme: State<GameTheme> = _currentTheme
 
     /** Set theme by unique key (e.g. "candy", "night", "neon", "terminal", etc.) */
