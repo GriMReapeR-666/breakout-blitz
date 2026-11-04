@@ -452,7 +452,7 @@ fun DeskHomeContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
                             Text(
                                 text = TradingModelManager.activePreset.slotName,
                                 color = deskGold,
@@ -463,8 +463,10 @@ fun DeskHomeContent(
                             Text(
                                 text = "PRIMARY MODEL: ${activeModel.name.uppercase()}",
                                 color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Black
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                         }
 
@@ -474,11 +476,12 @@ fun DeskHomeContent(
                             border = BorderStroke(1.dp, deskCyan)
                         ) {
                             Text(
-                                text = "TIER ${prog.tier} · ${prog.tierTitle}",
+                                text = "T${prog.tier} · ${prog.tierTitle}",
                                 color = deskCyan,
                                 fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                             )
                         }
