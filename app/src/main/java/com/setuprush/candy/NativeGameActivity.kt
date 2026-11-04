@@ -865,7 +865,7 @@ fun NativeGameScreen(
                             fontFamily = FontFamily.Monospace
                         )
                         Text(
-                            text = "· ${(activeSetup.accuracy * 100).toInt()}% MATCH",
+                            text = "· ${(activeSetup.winRate * 100).toInt()}% MATCH",
                             color = theme.muted,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
