@@ -432,7 +432,7 @@ fun NativeGameScreen(
                     MatchPerformanceEngine.MistakeCategory.NONE_FLAWLESS -> "Optimal execution. Repeat this exact trade process."
                 }
                 val moveGrade = when {
-                    isWin && rMult >= 1.8 && (timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.SNIPER_PERFECT || captureRatio >= 0.85) -> MatchPerformanceEngine.MoveGrade.BRILLIANT
+                    isWin && rMult >= 1.8 && (timingGrade == SetupExecutionTimingEngine.ExecutionTimingGrade.PERFECT_ENTRY || captureRatio >= 0.85) -> MatchPerformanceEngine.MoveGrade.BRILLIANT
                     isWin && rMult >= 1.5 -> MatchPerformanceEngine.MoveGrade.BEST
                     isWin && !isCutEarly -> MatchPerformanceEngine.MoveGrade.EXCELLENT
                     isWin -> MatchPerformanceEngine.MoveGrade.INACCURACY
@@ -837,7 +837,7 @@ fun NativeGameScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(horizontal = 14.dp, bottom = 12.dp),
+                .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

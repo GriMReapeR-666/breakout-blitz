@@ -237,7 +237,7 @@ fun GameMenuHub(
                     )
                     SetupRushNavTab.ACADEMY -> SetupRushAcademyContent(
                         onLaunchDrill = { setup, tier -> onOpenAcademyDrill(setup, tier) },
-                        onDeployMission = onDeployMission
+                        onDeployMission = onLaunchMission
                     )
                     SetupRushNavTab.GAME_REVIEW -> SetupRushGameReviewContent(theme = theme)
                     SetupRushNavTab.LEADERBOARD -> SetupRushLeaderboardContent()
@@ -570,7 +570,7 @@ fun SetupRushAcademyContent(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = activeSetupCard.description,
+                        text = activeSetupCard.lesson,
                         color = deskMuted,
                         fontSize = 9.5.sp
                     )
@@ -1151,8 +1151,8 @@ fun SetupRushJournalContent(theme: GameTheme) {
 
 @Composable
 fun SetupRushThemesContent() {
-    val allThemes = ThemeCatalog.ALL_THEMES
-    val currentKey = ThemeManager.currentTheme.value.key
+    val allThemes = ThemeCatalog.all()
+    val currentId = ThemeManager.currentTheme.value.id
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1160,7 +1160,7 @@ fun SetupRushThemesContent() {
     ) {
         item {
             Text(
-                text = "SETUP RUSH VISUAL THEMES (12 PALETTES)",
+                text = "SETUP RUSH VISUAL THEMES (14 PALETTES)",
                 color = deskMuted,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
@@ -1170,14 +1170,14 @@ fun SetupRushThemesContent() {
         }
 
         items(allThemes) { t ->
-            val isCurrent = t.key == currentKey
+            val isCurrent = t.id == currentId
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = if (isCurrent) deskOrange.copy(alpha = 0.15f) else deskPanelBg,
                 border = BorderStroke(1.5.dp, if (isCurrent) deskOrange else deskBorder),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { ThemeManager.setTheme(t.key) }
+                    .clickable { ThemeManager.setTheme(t.id) }
             ) {
                 Row(
                     modifier = Modifier
@@ -1190,13 +1190,12 @@ fun SetupRushThemesContent() {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(t.bg)
-                                .border(1.dp, t.grid, RoundedCornerShape(4.dp))
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = t.bg,
+                            border = BorderStroke(1.dp, t.grid),
+                            modifier = Modifier.size(24.dp)
+                        ) {}
                         Column {
                             Text(
                                 text = t.name.uppercase(),
@@ -1206,7 +1205,7 @@ fun SetupRushThemesContent() {
                                 fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                text = "Bull: ${if (t.isLight) "Light" else "Dark"} Mode · Key: ${t.key}",
+                                text = "${t.desc} · ID: ${t.id}",
                                 color = deskMuted,
                                 fontSize = 8.5.sp
                             )
