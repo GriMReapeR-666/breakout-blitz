@@ -66,6 +66,7 @@ fun GameMenuHub(
     var activeFormat by remember { mutableStateOf(OpponentDuelEngine.MATCH_FORMATS[0]) }
     var activeModel by remember { mutableStateOf(TradingModelManager.activeTradingModel) }
     var activePresetSlotIndex by remember { mutableIntStateOf(TradingModelManager.activePresetSlotIndex) }
+    var showInteractiveTutorial by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -237,7 +238,8 @@ fun GameMenuHub(
                     )
                     SetupRushNavTab.ACADEMY -> SetupRushAcademyContent(
                         onLaunchDrill = { setup, tier -> onOpenAcademyDrill(setup, tier) },
-                        onDeployMission = onLaunchMission
+                        onDeployMission = onLaunchMission,
+                        onOpenSimulator = { showInteractiveTutorial = true }
                     )
                     SetupRushNavTab.GAME_REVIEW -> SetupRushGameReviewContent(theme = theme)
                     SetupRushNavTab.LEADERBOARD -> SetupRushLeaderboardContent()
@@ -245,6 +247,13 @@ fun GameMenuHub(
                     SetupRushNavTab.THEMES -> SetupRushThemesContent()
                 }
             }
+        }
+
+        if (showInteractiveTutorial) {
+            UniversalTradingTutorialDialog(
+                theme = theme,
+                onDismiss = { showInteractiveTutorial = false }
+            )
         }
     }
 }
@@ -489,7 +498,8 @@ fun SetupRushModesContent(
 @Composable
 fun SetupRushAcademyContent(
     onLaunchDrill: (setup: StrategyCatalog.SetupCardData, tier: Int) -> Unit,
-    onDeployMission: (StrategyMasteryManager.SoloCampaignMission) -> Unit
+    onDeployMission: (StrategyMasteryManager.SoloCampaignMission) -> Unit,
+    onOpenSimulator: () -> Unit = {}
 ) {
     var selectedSetupKey by remember { mutableStateOf("sweep") }
     val setupCards = StrategyCatalog.ALL_SETUPS
@@ -573,6 +583,34 @@ fun SetupRushAcademyContent(
                         text = activeSetupCard.lesson,
                         color = deskMuted,
                         fontSize = 9.5.sp
+                    )
+                }
+            }
+        }
+
+        // Interactive Virtualized Strategy Simulator Launcher
+        item {
+            Button(
+                onClick = onOpenSimulator,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .shadow(10.dp, RoundedCornerShape(10.dp), spotColor = Color(0xFF2563EB))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("🎓", fontSize = 16.sp)
+                    Text(
+                        text = "LAUNCH INTERACTIVE PATTERN SIMULATOR",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
                     )
                 }
             }
