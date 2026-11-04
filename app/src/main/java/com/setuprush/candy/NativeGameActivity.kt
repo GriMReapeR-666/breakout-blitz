@@ -153,7 +153,7 @@ fun NativeGameScreen(
     val patternLockEnabled = true
 
     // Master Dialogs State (Defaults to true to show CODM-style Tactical Menu Hub on start)
-    var showMasterMenuHub by remember { mutableStateOf(true) }
+    var showMasterMenuHub by remember { mutableStateOf(false) }
     var showPreMatchShowcase by remember { mutableStateOf(false) }
     var pendingFormatId by remember { mutableStateOf("deathmatch_1v1") }
     var showModeStrategyDialog by remember { mutableStateOf(false) }
@@ -319,185 +319,7 @@ fun NativeGameScreen(
 
     val activeSetup = engine.setups.lastOrNull()
 
-    Scaffold(
-        containerColor = theme.bg,
-        topBar = {
-            // Clean, Institutional Setup Rush Header HUD (Guaranteed zero-overflow framing)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Top-Left: Career Bank & Tactile Reset Button
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Surface(
-                        color = theme.bg.copy(alpha = 0.95f),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, theme.bull.copy(alpha = 0.35f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "CAREER BANK",
-                                color = theme.muted,
-                                fontSize = 7.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "$${String.format("%,.2f", totalScore)}",
-                                    color = if (totalScore >= 10000.0) theme.bull else theme.bear,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                if (streak > 1) {
-                                    Surface(
-                                        color = Color(0xFFFF5A1F),
-                                        shape = RoundedCornerShape(3.dp)
-                                    ) {
-                                        Text(
-                                            text = "×$streak",
-                                            color = Color.White,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace,
-                                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Direct Account Balance Reset Button
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFFF334B).copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, Color(0xFFFF334B).copy(alpha = 0.6f)),
-                        modifier = Modifier.clickable {
-                            totalScore = 10000.0
-                            streak = 0
-                            playerTakesCount = 0
-                            playerStopsCount = 0
-                            StrategyMasteryManager.resetEvaluation()
-                            PlayerProfileManager.resetCareerStats()
-                            bridge.vibrate("tick")
-                            lastOutcome = "ACCOUNT RESET TO $10,000.00 · READY"
-                        }
-                    ) {
-                        Text(
-                            text = "🔄 RESET",
-                            color = Color(0xFFFF5268),
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-
-                // Top-Center: Market Symbol Badge
-                Surface(
-                    color = theme.bg.copy(alpha = 0.90f),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.35f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(theme.bull)
-                        )
-                        Text(
-                            text = activeSymbol.id,
-                            color = theme.text,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-
-                // Top-Right: Speed/Pause Pill, Theme, & Tactical HQ Menu
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    // Speed & Pause Toggle Pill
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isTapePaused) Color(0xFFFFC700).copy(alpha = 0.25f) else theme.grid.copy(alpha = 0.2f),
-                        border = BorderStroke(1.dp, if (isTapePaused) Color(0xFFFFC700) else theme.grid.copy(alpha = 0.4f)),
-                        modifier = Modifier.clickable {
-                            if (!isTapePaused && tapeSpeedMultiplier == 1.0f) {
-                                tapeSpeedMultiplier = 0.5f
-                                lastOutcome = "SPEED: 0.5× (SLOW DELIBERATE)"
-                            } else if (!isTapePaused && tapeSpeedMultiplier == 0.5f) {
-                                tapeSpeedMultiplier = 2.0f
-                                lastOutcome = "SPEED: 2.0× (TURBO)"
-                            } else if (!isTapePaused && tapeSpeedMultiplier == 2.0f) {
-                                isTapePaused = true
-                                lastOutcome = "TAPE PAUSED · ANALYZE SETUP"
-                            } else {
-                                isTapePaused = false
-                                tapeSpeedMultiplier = 1.0f
-                                lastOutcome = "SPEED: 1.0× (TACTICAL SPEED)"
-                            }
-                            bridge.vibrate("tick")
-                        }
-                    ) {
-                        Text(
-                            text = if (isTapePaused) "⏸ PAUSED" else "▶ ${tapeSpeedMultiplier}×",
-                            color = if (isTapePaused) Color(0xFFFFC700) else theme.text,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp)
-                        )
-                    }
-
-                    // Tactical HQ Menu / Return Button
-                    Surface(
-                        color = if (showMasterMenuHub) Color(0xFF1E2838) else Color(0xFFFFC700).copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, if (showMasterMenuHub) Color(0xFF384556) else Color(0xFFFFC700)),
-                        modifier = Modifier.clickable {
-                            showMasterMenuHub = !showMasterMenuHub
-                            bridge.vibrate("tick")
-                        }
-                    ) {
-                        Text(
-                            text = if (showMasterMenuHub) "▶ GAME" else "◀ DESK",
-                            color = if (showMasterMenuHub) Color.White else Color(0xFFFFC700),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        val performLongEntry = {
+    val performLongEntry = {
             if (!isPlayerHolding) {
                 val startP = SetupEngine.priceAt(engine.candles, tapePosition)
                 isPlayerHolding = true
@@ -671,6 +493,465 @@ fun NativeGameScreen(
             }
         }
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(theme.bg)
+    ) {
+        // =========================================================================
+        // 1. FULL-SCREEN CHART CANVAS (100% Edge-to-Edge Tape under all HUD)
+        // =========================================================================
+        ChartCanvas(
+            candles = engine.candles,
+            tapePosition = tapePosition,
+            theme = theme,
+            camera = camera,
+            activeSetup = activeSetup,
+            supertrendEnabled = supertrendEnabled,
+            structureEnabled = structureEnabled,
+            fvgEnabled = fvgEnabled,
+            emaCrossEnabled = emaCrossEnabled,
+            patternLockEnabled = patternLockEnabled,
+            isExternalHolding = isPlayerHolding,
+            externalDirection = activeDirection,
+            externalEntryPrice = tradeEntryPrice,
+            externalLivePnl = livePnl,
+            currentLeverage = currentLeverage,
+            onLongEntry = performLongEntry,
+            onShortEntry = performShortEntry,
+            onCashOut = { performCashOut() },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // =========================================================================
+        // 2. SETUP RUSH EXACT FLOATING TOP HUD (Zero-letterbox glass overlay)
+        // =========================================================================
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .align(Alignment.TopCenter),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            // [TOP-LEFT: Setup Rush Authentic P&L Card]
+            val displayPnl = if (isPlayerHolding) livePnl else (totalScore - 10000.0)
+            val isPositive = displayPnl >= 0
+            val pnlBorder = if (isPlayerHolding) {
+                if (isPositive) theme.bull.copy(alpha = 0.8f) else theme.bear.copy(alpha = 0.8f)
+            } else {
+                if (totalScore >= 10000.0) theme.bull.copy(alpha = 0.4f) else theme.bear.copy(alpha = 0.4f)
+            }
+            Surface(
+                color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, pnlBorder),
+                modifier = Modifier.widthIn(min = 120.dp, max = 160.dp)
+            ) {
+                Box {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "P&L",
+                                color = theme.muted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.2.sp
+                            )
+                            // Discrete Reset Icon
+                            Text(
+                                text = "🔄",
+                                fontSize = 8.5.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .clickable {
+                                        totalScore = 10000.0
+                                        streak = 0
+                                        playerTakesCount = 0
+                                        playerStopsCount = 0
+                                        StrategyMasteryManager.resetEvaluation()
+                                        PlayerProfileManager.resetCareerStats()
+                                        bridge.vibrate("tick")
+                                        lastOutcome = "ACCOUNT RESET TO $10,000.00 · READY"
+                                    }
+                            )
+                        }
+                        // Main P&L Value
+                        val valColor = if (isPlayerHolding) {
+                            if (isPositive) theme.bull else theme.bear
+                        } else {
+                            if (totalScore >= 10000.0) theme.bull else theme.bear
+                        }
+                        val formattedVal = if (isPlayerHolding) {
+                            val sign = if (displayPnl >= 0) "+$" else "-$"
+                            "$sign${String.format("%.2f", kotlin.math.abs(displayPnl))}"
+                        } else {
+                            "$${String.format("%,.2f", totalScore)}"
+                        }
+                        Text(
+                            text = formattedVal,
+                            color = valColor,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
+                        )
+                        // Subtitle row: LEV · WIN% · Streak
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 1.dp)
+                        ) {
+                            Text(
+                                text = "LEV ${currentLeverage.toInt()}×",
+                                color = theme.muted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            val totalTrades = playerTakesCount + playerStopsCount
+                            val winText = if (totalTrades > 0) "${((playerTakesCount.toDouble() / totalTrades) * 100).toInt()}% WIN"
+                                          else if (isPlayerHolding) "RIDING" else "1ST RIDE"
+                            Text(
+                                text = winText,
+                                color = theme.muted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            if (streak > 1) {
+                                Surface(
+                                    color = Color(0xFFFF5A1F),
+                                    shape = RoundedCornerShape(3.dp)
+                                ) {
+                                    Text(
+                                        text = "×$streak",
+                                        color = Color.White,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(horizontal = 2.5.dp, vertical = 0.5.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    // Setup Rush au sparkline edge bar
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .background(if (isPositive) theme.bull else theme.bear)
+                    )
+                }
+            }
+
+            // [TOP-CENTER: Setup Rush Symbol / Mode Pill]
+            Surface(
+                color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF232D3F)),
+                modifier = Modifier.clickable { showModeStrategyDialog = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(theme.bull)
+                    )
+                    Text(
+                        text = activeSymbol.id,
+                        color = theme.text,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "· ${currentMode.displayName.split(" ")[0].uppercase()}",
+                        color = Color(0xFFFF5A1F),
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // [TOP-RIGHT: Setup Rush Clock & Actions Cluster]
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                // Round Clock Box
+                val remainingSec = kotlin.math.max(0, 120 - elapsedSeconds.toInt())
+                val minPart = remainingSec / 60
+                val secPart = remainingSec % 60
+                val isUrgent = remainingSec <= 15
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                    border = BorderStroke(1.dp, if (isUrgent) theme.bear else Color(0xFF232D3F)),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${minPart}:${secPart.toString().padStart(2, '0')}",
+                                color = if (isUrgent) theme.bear else theme.text,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        val timeFrac = (remainingSec / 120f).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth(timeFrac)
+                                .height(2.5.dp)
+                                .background(if (isUrgent) theme.bear else Color(0xFFFF5A1F))
+                        )
+                    }
+                }
+
+                // Controls Row (Indicators, Sound, Pause, Desk)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Indicators Button
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                        border = BorderStroke(1.dp, Color(0xFF232D3F)),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clickable { showIndicatorDialog = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                            Text(
+                                text = "📊 ${activeIndicatorIds.size}",
+                                color = theme.text,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    // Sound Button
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                        border = BorderStroke(1.dp, Color(0xFF232D3F)),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clickable {
+                                com.setuprush.candy.engine.SoundEffectManager.isMuted = !com.setuprush.candy.engine.SoundEffectManager.isMuted
+                                bridge.vibrate("tick")
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                            Text(
+                                text = if (com.setuprush.candy.engine.SoundEffectManager.isMuted) "🔇" else "🔊",
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Pause Button
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isTapePaused) Color(0xFFFFC700).copy(alpha = 0.25f) else Color(0xFF0A0A0B).copy(alpha = 0.90f),
+                        border = BorderStroke(1.dp, if (isTapePaused) Color(0xFFFFC700) else Color(0xFF232D3F)),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clickable {
+                                isTapePaused = !isTapePaused
+                                bridge.vibrate("tick")
+                                lastOutcome = if (isTapePaused) "TAPE PAUSED · ANALYZE SETUP" else "TAPE RESUMED"
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 6.dp)) {
+                            Text(
+                                text = if (isTapePaused) "▶" else "⏸",
+                                color = if (isTapePaused) Color(0xFFFFC700) else theme.text,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+
+                    // Desk Toggle Button
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (showMasterMenuHub) Color(0xFF1E2838) else Color(0xFFFF5A1F).copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, if (showMasterMenuHub) Color(0xFF384556) else Color(0xFFFF5A1F)),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clickable {
+                                showMasterMenuHub = !showMasterMenuHub
+                                bridge.vibrate("tick")
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                            Text(
+                                text = if (showMasterMenuHub) "▶ GAME" else "⚙️ DESK",
+                                color = if (showMasterMenuHub) Color.White else Color(0xFFFF5A1F),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 3. FLOATING CONTEXTUAL SETUP ALERT BANNER (Pattern Trigger / Solo Drill)
+        // =========================================================================
+        val currentMission = StrategyMasteryManager.activeMission
+        if (activeSetup != null || currentMission != null || activeStrategyKey != null) {
+            Surface(
+                color = Color(0xFF0A0A0B).copy(alpha = 0.92f),
+                shape = RoundedCornerShape(6.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (activeSetup != null) {
+                        if (activeSetup.dir == 1) theme.bull.copy(alpha = 0.7f) else theme.bear.copy(alpha = 0.7f)
+                    } else Color(0xFF232D3F)
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 62.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (activeSetup != null) {
+                        val isBull = activeSetup.dir == 1
+                        Text(
+                            text = if (isBull) "▲" else "▼",
+                            color = if (isBull) theme.bull else theme.bear,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = activeSetup.name.uppercase(),
+                            color = if (isBull) theme.bull else theme.bear,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "· ${(activeSetup.accuracy * 100).toInt()}% MATCH",
+                            color = theme.muted,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else if (currentMission != null) {
+                        Text(
+                            text = "OP ${currentMission.levelId} · ${currentMission.callsign} [${currentMission.targetSetupKey.uppercase()}]",
+                            color = Color(0xFF00E5FF),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else if (activeStrategyKey != null) {
+                        Text(
+                            text = "SOLO DRILL · ${activeStrategyKey!!.uppercase()}",
+                            color = Color(0xFF00E5FF),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 4. COMPETITIVE OPPONENT RADAR (PvP 1v1 duels only)
+        // =========================================================================
+        if (OpponentDuelEngine.isCompetitiveActive && StrategyMasteryManager.activeMission == null && activeStrategyKey == null) {
+            OpponentRadarHUD(
+                theme = theme,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 68.dp, end = 10.dp)
+            )
+        }
+
+        // =========================================================================
+        // 5. FLOATING OUTCOME TOAST
+        // =========================================================================
+        lastOutcome?.let { msg ->
+            Surface(
+                color = Color(0xFF0A0A0B).copy(alpha = 0.94f),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, Color(0xFF232D3F)),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 105.dp)
+            ) {
+                Text(
+                    text = msg,
+                    color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) theme.bull
+                    else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) theme.bear
+                    else theme.text,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        // =========================================================================
+        // 6. SETUP RUSH DEDICATED BOTTOM ACTION BAR (Micro-hint & Dual Buttons)
+        // =========================================================================
+        TacticalHoldToRideBar(
+            isPlayerHolding = isPlayerHolding,
+            activeDirection = activeDirection,
+            livePnl = livePnl,
+            currentLeverage = currentLeverage,
+            canShort = currentMode != GameMode.RUSH,
+            theme = theme,
+            onStartLong = performLongEntry,
+            onStartShort = performShortEntry,
+            onRelease = performCashOut,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
+
+        // =========================================================================
+        // 7. MODALS & DIALOGS OVERLAYS
+        // =========================================================================
         if (showMasterMenuHub) {
             GameMenuHub(
                 theme = theme,
@@ -743,205 +1024,8 @@ fun NativeGameScreen(
                 },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    
             )
-        } else {
-            // Full Tactical Combat Screen: Chart Stage + Dedicated Bottom Action Bar
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // 1. Chart Stage (Takes full available vertical space above action bar)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    ChartCanvas(
-                        candles = engine.candles,
-                        tapePosition = tapePosition,
-                        theme = theme,
-                        camera = camera,
-                        activeSetup = activeSetup,
-                        supertrendEnabled = supertrendEnabled,
-                        structureEnabled = structureEnabled,
-                        fvgEnabled = fvgEnabled,
-                        emaCrossEnabled = emaCrossEnabled,
-                        patternLockEnabled = patternLockEnabled,
-                        isExternalHolding = isPlayerHolding,
-                        externalDirection = activeDirection,
-                        externalEntryPrice = tradeEntryPrice,
-                        externalLivePnl = livePnl,
-                        currentLeverage = currentLeverage,
-                        onLongEntry = performLongEntry,
-                        onShortEntry = performShortEntry,
-                        onCashOut = { performCashOut() },
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    // 1b. Unified Docked In-Game Cockpit Info Strip (Zero-Overlap Framing)
-                    Surface(
-                        color = Color(0xFF090D14).copy(alpha = 0.94f),
-                        shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
-                        border = BorderStroke(1.dp, Color(0xFF1E2838)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Left: Mission / Solo Strategy Indicator
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val currentMission = StrategyMasteryManager.activeMission
-                                if (currentMission != null) {
-                                    Surface(
-                                        color = Color(0xFFFFC700),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "OP ${currentMission.levelId}",
-                                            color = Color.Black,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "${currentMission.callsign} [${currentMission.targetSetupKey.uppercase()}]",
-                                        color = Color(0xFF00E5FF),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                } else if (activeStrategyKey != null) {
-                                    Surface(
-                                        color = Color(0xFF00E5FF),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "SOLO GRIND",
-                                            color = Color.Black,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = activeStrategyKey!!.uppercase(),
-                                        color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                } else {
-                                    Text(
-                                        text = "⚡ LIVE DESK · ALL SETUPS",
-                                        color = theme.muted,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-
-                            // Right: Setup Radar Alert & Mastery 5-Trade Series Tracker
-                            val evaluation = StrategyMasteryManager.activeEvaluation
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (activeSetup != null) {
-                                    val isBull = activeSetup.dir == 1
-                                    val badgeColor = if (isBull) theme.bull else theme.bear
-                                    Surface(
-                                        color = badgeColor.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(4.dp),
-                                        border = BorderStroke(1.dp, badgeColor)
-                                    ) {
-                                        Text(
-                                            text = if (isBull) "▲ LONG TRIGGER" else "▼ SHORT TRIGGER",
-                                            color = badgeColor,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Black,
-                                            fontFamily = FontFamily.Monospace,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                        )
-                                    }
-                                }
-
-                                if (evaluation != null) {
-                                    Text(
-                                        text = "${evaluation.completedCount}/5 · ${(evaluation.winRate * 100).toInt()}% WIN · ${if (evaluation.netR >= 0) "+" else ""}${String.format("%.1f", evaluation.netR)}R",
-                                        color = if (evaluation.winRate >= 0.6) Color(0xFF00E676) else Color(0xFFFFC700),
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 3. Competitive Opponent Radar (ONLY during PvP 1v1 duels, never during solo grind)
-                    if (OpponentDuelEngine.isCompetitiveActive && StrategyMasteryManager.activeMission == null && activeStrategyKey == null) {
-                        OpponentRadarHUD(
-                            theme = theme,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 42.dp, end = 10.dp)
-                        )
-                    }
-
-                    // 4. Floating Outcome Toast Message
-                    lastOutcome?.let { msg ->
-                        Surface(
-                            color = theme.bg.copy(alpha = 0.94f),
-                            shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.dp, theme.grid.copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp)
-                        ) {
-                            Text(
-                                text = msg,
-                                color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) theme.bull
-                                else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) theme.bear
-                                else theme.text,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                }
-
-                // 2. Tactical Dedicated Hold-to-Ride Action Bar (BUY & SELL Buttons with zero overlap)
-                TacticalHoldToRideBar(
-                    isPlayerHolding = isPlayerHolding,
-                    activeDirection = activeDirection,
-                    livePnl = livePnl,
-                    currentLeverage = currentLeverage,
-                    canShort = currentMode != GameMode.RUSH,
-                    theme = theme,
-                    onStartLong = performLongEntry,
-                    onStartShort = performShortEntry,
-                    onRelease = performCashOut,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
 
         // Dialogs & Modals Overlays
@@ -1112,8 +1196,9 @@ fun TacticalHoldToRideBar(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = Color(0xFF090D14),
-        border = BorderStroke(1.dp, Color(0xFF1B2433)),
+        color = Color(0xFF0A0A0B).copy(alpha = 0.88f),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        border = BorderStroke(1.dp, Color(0xFF1E2838).copy(alpha = 0.6f)),
         modifier = modifier
     ) {
         Column(
@@ -1122,15 +1207,33 @@ fun TacticalHoldToRideBar(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            // Micro hint text
-            Text(
-                text = if (isPlayerHolding) "HOLDING POSITION · RELEASE BUTTON TO CASH OUT" else "PRESS & HOLD BUTTON TO RIDE · RELEASE TO CASH OUT",
-                color = if (isPlayerHolding) Color(0xFFFFC700) else Color(0xFF8A99AD),
-                fontSize = 8.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            // Setup Rush Authentic Tactical Micro-Hint Pill
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .background(Color(0xFF141923).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(if (isPlayerHolding) (if (activeDirection > 0) Color(0xFF00E676) else Color(0xFFFF334B)) else Color(0xFFFF5A1F))
+                )
+                Text(
+                    text = if (isPlayerHolding) {
+                        "${if (activeDirection > 0) "Long" else "Short"} ${currentLeverage.toInt()}× · let go to cash out"
+                    } else {
+                        "Tap speeds up · hold to ride"
+                    },
+                    color = if (isPlayerHolding) Color(0xFFFFC700) else Color(0xFF8A99AD),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
 
             Row(
                 modifier = Modifier
