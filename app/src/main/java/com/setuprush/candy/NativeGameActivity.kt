@@ -1,5 +1,13 @@
 package com.setuprush.candy
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+
 import kotlin.math.*
 
 import android.content.Intent
@@ -106,6 +114,27 @@ class NativeGameActivity : ComponentActivity() {
     override fun onDestroy() {
         com.setuprush.candy.engine.SoundEffectManager.release()
         super.onDestroy()
+    }
+}
+
+
+/**
+ * Setup Rush Authentic 45-degree Chamfer Geometry
+ * Top-Right and Bottom-Left corners cut at 45 degrees (--ch polygon parity).
+ */
+class ChamferShape(private val chamferDp: Dp = 8.dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val ch = with(density) { chamferDp.toPx() }
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width - ch, 0f)
+            lineTo(size.width, ch)
+            lineTo(size.width, size.height)
+            lineTo(ch, size.height)
+            lineTo(0f, size.height - ch)
+            close()
+        }
+        return Outline.Generic(path)
     }
 }
 
@@ -524,300 +553,232 @@ fun NativeGameScreen(
         )
 
         // =========================================================================
-        // 2. SETUP RUSH EXACT FLOATING TOP HUD (Zero-letterbox glass overlay)
+        // 2. SETUP RUSH EXACT TOP HUD (Zero-letterbox glass overlay)
         // =========================================================================
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
                 .align(Alignment.TopCenter),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            // [TOP-LEFT: Setup Rush Authentic P&L Card]
+            // [TOP-LEFT: Setup Rush Chamfered P&L / Bank Card]
             val displayPnl = if (isPlayerHolding) livePnl else (totalScore - 10000.0)
-            val isPositive = displayPnl >= 0
-            val pnlBorder = if (isPlayerHolding) {
-                if (isPositive) theme.bull.copy(alpha = 0.8f) else theme.bear.copy(alpha = 0.8f)
+            val pnlText = if (currentMode == GameMode.BLOWUP && !isPlayerHolding) {
+                "$${String.format("%,.0f", totalScore)}"
+            } else if (isPlayerHolding) {
+                val sign = if (displayPnl >= 0) "+$" else "-$"
+                "$sign${String.format("%,.0f", kotlin.math.abs(displayPnl))}"
             } else {
-                if (totalScore >= 10000.0) theme.bull.copy(alpha = 0.4f) else theme.bear.copy(alpha = 0.4f)
+                val sign = if (displayPnl >= 0) "+$" else "-$"
+                "$sign${String.format("%,.0f", kotlin.math.abs(displayPnl))}"
             }
             Surface(
-                color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, pnlBorder),
-                modifier = Modifier.widthIn(min = 120.dp, max = 160.dp)
+                color = Color(0xFF0E1117).copy(alpha = 0.92f),
+                shape = ChamferShape(8.dp),
+                border = BorderStroke(1.dp, Color(0xFF262D3B)),
+                modifier = Modifier.width(135.dp)
             ) {
-                Box {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "P&L",
-                                color = theme.muted,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.2.sp
-                            )
-                            // Discrete Reset Icon
-                            Text(
-                                text = "🔄",
-                                fontSize = 8.5.sp,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .clickable {
-                                        totalScore = 10000.0
-                                        streak = 0
-                                        playerTakesCount = 0
-                                        playerStopsCount = 0
-                                        StrategyMasteryManager.resetEvaluation()
-                                        PlayerProfileManager.resetCareerStats()
-                                        bridge.vibrate("tick")
-                                        lastOutcome = "ACCOUNT RESET TO $10,000.00 · READY"
-                                    }
-                            )
-                        }
-                        // Main P&L Value
-                        val valColor = if (isPlayerHolding) {
-                            if (isPositive) theme.bull else theme.bear
-                        } else {
-                            if (totalScore >= 10000.0) theme.bull else theme.bear
-                        }
-                        val formattedVal = if (isPlayerHolding) {
-                            val sign = if (displayPnl >= 0) "+$" else "-$"
-                            "$sign${String.format("%.2f", kotlin.math.abs(displayPnl))}"
-                        } else {
-                            "$${String.format("%,.2f", totalScore)}"
-                        }
-                        Text(
-                            text = formattedVal,
-                            color = valColor,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1
-                        )
-                        // Subtitle row: LEV · WIN% · Streak
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(top = 1.dp)
-                        ) {
-                            Text(
-                                text = "LEV ${currentLeverage.toInt()}×",
-                                color = theme.muted,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            val totalTrades = playerTakesCount + playerStopsCount
-                            val winText = if (totalTrades > 0) "${((playerTakesCount.toDouble() / totalTrades) * 100).toInt()}% WIN"
-                                          else if (isPlayerHolding) "RIDING" else "1ST RIDE"
-                            Text(
-                                text = winText,
-                                color = theme.muted,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            if (streak > 1) {
-                                Surface(
-                                    color = Color(0xFFFF5A1F),
-                                    shape = RoundedCornerShape(3.dp)
-                                ) {
-                                    Text(
-                                        text = "×$streak",
-                                        color = Color.White,
-                                        fontSize = 7.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 2.5.dp, vertical = 0.5.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    // Setup Rush au sparkline edge bar
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(if (isPositive) theme.bull else theme.bear)
-                    )
-                }
-            }
-
-            // [TOP-CENTER: Setup Rush Symbol / Mode Pill]
-            Surface(
-                color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color(0xFF232D3F)),
-                modifier = Modifier.clickable { showModeStrategyDialog = true }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Column(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(theme.bull)
+                    Text(
+                        text = if (currentMode == GameMode.BLOWUP) "BANK" else "P&L",
+                        color = Color(0xFF717886),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp
                     )
                     Text(
-                        text = activeSymbol.id,
-                        color = theme.text,
-                        fontSize = 11.sp,
+                        text = pnlText,
+                        color = if (displayPnl < 0) Color(0xFFFF4B3E) else Color.White,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
                     )
+                    val subText = if (currentMode == GameMode.BLOWUP) "LEV ${String.format("%.1f", currentLeverage)}×"
+                                  else if (isPlayerHolding) "RIDING"
+                                  else if (playerTakesCount + playerStopsCount == 0) "1ST RIDE"
+                                  else "${((playerTakesCount.toDouble() / (playerTakesCount + playerStopsCount)) * 100).toInt()}% WIN"
                     Text(
-                        text = "· ${currentMode.displayName.split(" ")[0].uppercase()}",
-                        color = Color(0xFFFF5A1F),
-                        fontSize = 8.5.sp,
+                        text = subText,
+                        color = Color(0xFF717886),
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Setup Rush exact 18-segment tick meter (▪▪▪▪▪▫▫▫▫)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val totalTicks = 18
+                        val totalTrades = playerTakesCount + playerStopsCount
+                        val activeTicks = if (totalTrades == 0) (if (isPlayerHolding) 3 else 1)
+                                          else ((playerTakesCount.toDouble() / totalTrades) * totalTicks).toInt().coerceIn(1, totalTicks)
+                        for (idx in 0 until totalTicks) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(3.dp)
+                                    .background(
+                                        if (idx < activeTicks) (if (idx == activeTicks - 1 && isPlayerHolding) Color(0xFFFF5A1F) else Color.White)
+                                        else Color(0xFF1E2430)
+                                    )
+                            )
+                        }
+                    }
                 }
             }
 
-            // [TOP-RIGHT: Setup Rush Clock & Actions Cluster]
+            // [TOP-RIGHT: Setup Rush Chamfered Cluster]
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Round Clock Box
-                val remainingSec = kotlin.math.max(0, 120 - elapsedSeconds.toInt())
-                val minPart = remainingSec / 60
-                val secPart = remainingSec % 60
-                val isUrgent = remainingSec <= 15
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                    border = BorderStroke(1.dp, if (isUrgent) theme.bear else Color(0xFF232D3F)),
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "${minPart}:${secPart.toString().padStart(2, '0')}",
-                                color = if (isUrgent) theme.bear else theme.text,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        val timeFrac = (remainingSec / 120f).coerceIn(0f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .fillMaxWidth(timeFrac)
-                                .height(2.5.dp)
-                                .background(if (isUrgent) theme.bear else Color(0xFFFF5A1F))
-                        )
-                    }
-                }
-
-                // Controls Row (Indicators, Sound, Pause, Desk)
+                // Top Row: Mode Badge + Timer Box
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Indicators Button
+                    // Mode Chamfer Badge
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                        border = BorderStroke(1.dp, Color(0xFF232D3F)),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clickable { showIndicatorDialog = true }
+                        color = Color(0xFF0E1117).copy(alpha = 0.92f),
+                        shape = ChamferShape(6.dp),
+                        border = BorderStroke(1.dp, Color(0xFF262D3B)),
+                        modifier = Modifier.clickable { showModeStrategyDialog = true }
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
                             Text(
-                                text = "📊 ${activeIndicatorIds.size}",
-                                color = theme.text,
-                                fontSize = 8.5.sp,
+                                text = currentMode.displayName.split(" ")[0].uppercase(),
+                                color = Color.White,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp
                             )
                         }
                     }
 
-                    // Sound Button
+                    // Timer Chamfer Box with Bottom Progress Bar
+                    val remainingSec = kotlin.math.max(0, 120 - elapsedSeconds.toInt())
+                    val minPart = remainingSec / 60
+                    val secPart = remainingSec % 60
+                    val isUrgent = remainingSec <= 15
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                        border = BorderStroke(1.dp, Color(0xFF232D3F)),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clickable {
-                                com.setuprush.candy.engine.SoundEffectManager.isMuted = !com.setuprush.candy.engine.SoundEffectManager.isMuted
-                                bridge.vibrate("tick")
-                            }
+                        color = Color(0xFF0E1117).copy(alpha = 0.92f),
+                        shape = ChamferShape(6.dp),
+                        border = BorderStroke(1.dp, if (isUrgent) Color(0xFFFF4B3E) else Color(0xFF262D3B))
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "${minPart}:${secPart.toString().padStart(2, '0')}",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            val timeFrac = (remainingSec / 120f).coerceIn(0f, 1f)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .fillMaxWidth(timeFrac)
+                                    .height(2.5.dp)
+                                    .background(if (isUrgent) Color(0xFFFF4B3E) else Color(0xFFFF5A1F))
+                            )
+                        }
+                    }
+                }
+
+                // Bottom Row: Segmented 4-Button Toolbar: [ ⏸ | 🔊 | 📈 | 〉]
+                Surface(
+                    color = Color(0xFF0E1117).copy(alpha = 0.92f),
+                    shape = ChamferShape(6.dp),
+                    border = BorderStroke(1.dp, Color(0xFF262D3B))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Button 1: Pause / Resume
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(width = 34.dp, height = 30.dp)
+                                .clickable {
+                                    isTapePaused = !isTapePaused
+                                    bridge.vibrate("tick")
+                                    lastOutcome = if (isTapePaused) "TAPE PAUSED · ANALYZE SETUP" else "TAPE RESUMED"
+                                }
+                        ) {
+                            Text(
+                                text = if (isTapePaused) "▶" else "00",
+                                color = if (isTapePaused) Color(0xFFFFC700) else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color(0xFF262D3B)))
+
+                        // Button 2: Sound Toggle
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(width = 34.dp, height = 30.dp)
+                                .clickable {
+                                    com.setuprush.candy.engine.SoundEffectManager.isMuted = !com.setuprush.candy.engine.SoundEffectManager.isMuted
+                                    bridge.vibrate("tick")
+                                }
+                        ) {
                             Text(
                                 text = if (com.setuprush.candy.engine.SoundEffectManager.isMuted) "🔇" else "🔊",
-                                fontSize = 10.sp
+                                fontSize = 11.sp
                             )
                         }
-                    }
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color(0xFF262D3B)))
 
-                    // Pause Button
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isTapePaused) Color(0xFFFFC700).copy(alpha = 0.25f) else Color(0xFF0A0A0B).copy(alpha = 0.90f),
-                        border = BorderStroke(1.dp, if (isTapePaused) Color(0xFFFFC700) else Color(0xFF232D3F)),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clickable {
-                                isTapePaused = !isTapePaused
-                                bridge.vibrate("tick")
-                                lastOutcome = if (isTapePaused) "TAPE PAUSED · ANALYZE SETUP" else "TAPE RESUMED"
-                            }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 6.dp)) {
+                        // Button 3: Indicators Toggle
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(width = 34.dp, height = 30.dp)
+                                .clickable { showIndicatorDialog = true }
+                        ) {
                             Text(
-                                text = if (isTapePaused) "▶" else "⏸",
-                                color = if (isTapePaused) Color(0xFFFFC700) else theme.text,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black
+                                text = "📈",
+                                fontSize = 11.sp
                             )
                         }
-                    }
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color(0xFF262D3B)))
 
-                    // Desk Toggle Button
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (showMasterMenuHub) Color(0xFF1E2838) else Color(0xFFFF5A1F).copy(alpha = 0.18f),
-                        border = BorderStroke(1.dp, if (showMasterMenuHub) Color(0xFF384556) else Color(0xFFFF5A1F)),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clickable {
-                                showMasterMenuHub = !showMasterMenuHub
-                                bridge.vibrate("tick")
-                            }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp)) {
+                        // Button 4: Desk / Menu Drawer
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(width = 34.dp, height = 30.dp)
+                                .clickable {
+                                    showMasterMenuHub = !showMasterMenuHub
+                                    bridge.vibrate("tick")
+                                }
+                        ) {
                             Text(
-                                text = if (showMasterMenuHub) "▶ GAME" else "⚙️ DESK",
-                                color = if (showMasterMenuHub) Color.White else Color(0xFFFF5A1F),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
+                                text = "〉",
+                                color = Color(0xFFAAAAAA),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -826,130 +787,152 @@ fun NativeGameScreen(
         }
 
         // =========================================================================
-        // 3. FLOATING CONTEXTUAL SETUP ALERT BANNER (Pattern Trigger / Solo Drill)
-        // =========================================================================
-        val currentMission = StrategyMasteryManager.activeMission
-        if (activeSetup != null || currentMission != null || activeStrategyKey != null) {
-            Surface(
-                color = Color(0xFF0A0A0B).copy(alpha = 0.92f),
-                shape = RoundedCornerShape(6.dp),
-                border = BorderStroke(
-                    1.dp,
-                    if (activeSetup != null) {
-                        if (activeSetup.dir == 1) theme.bull.copy(alpha = 0.7f) else theme.bear.copy(alpha = 0.7f)
-                    } else Color(0xFF232D3F)
-                ),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 62.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (activeSetup != null) {
-                        val isBull = activeSetup.dir == 1
-                        Text(
-                            text = if (isBull) "▲" else "▼",
-                            color = if (isBull) theme.bull else theme.bear,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                        Text(
-                            text = activeSetup.name.uppercase(),
-                            color = if (isBull) theme.bull else theme.bear,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "· ${(activeSetup.winRate * 100).toInt()}% MATCH",
-                            color = theme.muted,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else if (currentMission != null) {
-                        Text(
-                            text = "OP ${currentMission.levelId} · ${currentMission.callsign} [${currentMission.targetSetupKey.uppercase()}]",
-                            color = Color(0xFF00E5FF),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else if (activeStrategyKey != null) {
-                        Text(
-                            text = "SOLO DRILL · ${activeStrategyKey!!.uppercase()}",
-                            color = Color(0xFF00E5FF),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-        }
-
-        // =========================================================================
-        // 4. COMPETITIVE OPPONENT RADAR (PvP 1v1 duels only)
-        // =========================================================================
-        if (OpponentDuelEngine.isCompetitiveActive && StrategyMasteryManager.activeMission == null && activeStrategyKey == null) {
-            OpponentRadarHUD(
-                theme = theme,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 68.dp, end = 10.dp)
-            )
-        }
-
-        // =========================================================================
-        // 5. FLOATING OUTCOME TOAST
+        // 3. FLOATING OUTCOME TOAST
         // =========================================================================
         lastOutcome?.let { msg ->
             Surface(
-                color = Color(0xFF0A0A0B).copy(alpha = 0.94f),
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, Color(0xFF232D3F)),
+                color = Color(0xFF0E1117).copy(alpha = 0.94f),
+                shape = ChamferShape(6.dp),
+                border = BorderStroke(1.dp, Color(0xFF262D3B)),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(bottom = 105.dp)
+                    .padding(bottom = 60.dp)
             ) {
                 Text(
                     text = msg,
-                    color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) theme.bull
-                    else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) theme.bear
-                    else theme.text,
+                    color = if (msg.contains("+") || msg.contains("LONG") || msg.contains("VICTORY") || msg.contains("CASHED")) Color.White
+                    else if (msg.contains("-") || msg.contains("LOSS") || msg.contains("STOPPED") || msg.contains("LIQUIDATED")) Color(0xFFFF4B3E)
+                    else Color(0xFF8A99AD),
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
         }
 
         // =========================================================================
-        // 6. SETUP RUSH DEDICATED BOTTOM ACTION BAR (Micro-hint & Dual Buttons)
+        // 4. SETUP RUSH DOCK: MICRO-HINT & TACTILE TRIGGERS (Zero-Deformation)
         // =========================================================================
-        TacticalHoldToRideBar(
-            isPlayerHolding = isPlayerHolding,
-            activeDirection = activeDirection,
-            livePnl = livePnl,
-            currentLeverage = currentLeverage,
-            canShort = currentMode != GameMode.RUSH,
-            theme = theme,
-            onStartLong = performLongEntry,
-            onStartShort = performShortEntry,
-            onRelease = performCashOut,
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-        )
+                .padding(horizontal = 14.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Tactile SHORT Trigger (Low-profile chamfered button)
+            val isShortActive = isPlayerHolding && activeDirection == -1
+            Surface(
+                color = if (isShortActive) Color(0xFFFF4B3E) else Color(0xFF0E1117).copy(alpha = 0.85f),
+                shape = ChamferShape(4.dp),
+                border = BorderStroke(1.dp, if (isShortActive) Color(0xFFFF4B3E) else Color(0xFFFF4B3E).copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .height(30.dp)
+                    .pointerInput(currentMode) {
+                        if (currentMode != GameMode.RUSH) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                performShortEntry()
+                                do {
+                                    val event = awaitPointerEvent()
+                                } while (event.changes.any { it.pressed })
+                                performCashOut()
+                            }
+                        }
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
+                    Text(
+                        text = if (isShortActive) "SHORT RIDING" else "▼ SHORT",
+                        color = if (isShortActive) Color.White else Color(0xFFFF8A80),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
 
-        // =========================================================================
+            // Centered Setup Rush Authentic Micro-Hint Pill
+            Surface(
+                color = Color(0xFF0E1117).copy(alpha = 0.90f),
+                shape = ChamferShape(4.dp),
+                border = BorderStroke(1.dp, Color(0xFF262D3B)),
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(if (isPlayerHolding) (if (activeDirection > 0) Color.White else Color(0xFFFF4B3E)) else Color(0xFFFF5A1F))
+                    )
+                    Text(
+                        text = if (isPlayerHolding) {
+                            "${if (activeDirection > 0) "Long" else "Short"} ${currentLeverage.toInt()}× · let go to cash out"
+                        } else {
+                            "Tap speeds up · hold to ride"
+                        },
+                        color = if (isPlayerHolding) Color.White else Color(0xFF8A99AD),
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(22.dp)
+                            .height(2.5.dp)
+                            .background(Color(0xFF1E2430))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(if (tapeSpeedMultiplier > 1f) 1f else if (tapeSpeedMultiplier > 0.5f) 0.5f else 0.25f)
+                                .background(Color(0xFFFF5A1F))
+                        )
+                    }
+                }
+            }
+
+            // Tactile LONG Trigger (Low-profile chamfered button)
+            val isLongActive = isPlayerHolding && activeDirection == 1
+            Surface(
+                color = if (isLongActive) Color.White else Color(0xFF0E1117).copy(alpha = 0.85f),
+                shape = ChamferShape(4.dp),
+                border = BorderStroke(1.dp, if (isLongActive) Color.White else Color(0xFF8A99AD).copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .height(30.dp)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            performLongEntry()
+                            do {
+                                val event = awaitPointerEvent()
+                            } while (event.changes.any { it.pressed })
+                            performCashOut()
+                        }
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
+                    Text(
+                        text = if (isLongActive) "LONG RIDING" else "▲ LONG",
+                        color = if (isLongActive) Color.Black else Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+                // =========================================================================
         // 7. MODALS & DIALOGS OVERLAYS
         // =========================================================================
         if (showMasterMenuHub) {
